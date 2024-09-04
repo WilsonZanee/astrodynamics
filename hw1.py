@@ -26,13 +26,16 @@ print(f"Halley's comet will return to perihelion: {orbit_end_time}")
 # Question 3: Earth Satellite
 
 km_per_s = u.km/u.s
-Du = R_mean_earth.to(u.km)
+Du = u.def_unit("Du", R_mean_earth.to(u.km))
+Tu = u.def_unit("Tu", 806.8*u.s)
 meu_earth = 1
 
 p = 13778*u.km.to(Du)
-print(p)
 velo_p = 6.5*km_per_s #km/s
+velo_p_canon = velo_p.to(Du/Tu)
 momentum = util.angular_momentum_from_p(p, meu_earth)
 print(momentum)
+spec_energy = util.specific_energy_from_velo(velo_p_canon, 1, p)
+print(spec_energy)
 
 
