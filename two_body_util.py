@@ -2,6 +2,7 @@ from math import pi, sqrt, cos
 
 import poliastro
 from astropy import units as u
+import numpy as np
 
 MU_EARTH = u.def_unit("Mu Earth", 5.972e24*u.kg) 
 DU_EARTH = u.def_unit("Du Earth", 6379.1*u.km) 
@@ -22,16 +23,16 @@ angular_momentum = u.km**2/u.s
 
 
 def elliptical_period(a, meu):
-    period = 2*pi*a**(3/2) / sqrt(meu)
+    period = 2*pi*a**(1.5) / sqrt(meu)
     return period
 
 #************************* Conservative Variables *****************************
 def specific_energy_from_velo(velo, meu, radius):
-    energy = (velo**2/2) - (meu/radius)
+    energy = ((velo**2)/2) - (meu/radius)
     return energy
 
 def angular_momentum_from_p(p, meu):
-    momentum = sqrt(p*meu) 
+    momentum = np.sqrt(p*meu) 
     return momentum
 
 #************************ Orbital Elements ************************************
