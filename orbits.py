@@ -51,6 +51,8 @@ class Orbit:
         self.ra = Orbit.get_ra(self.a, self.eccentricity)
         self.rp = Orbit.get_rp(self.a, self.eccentricity)
 
+        self.orbital_elements = Orbit.get_orbital_elements_from_rv(self.r, self.v)
+
     def get_ra(a, e):
         ra = a*(1+e)
         return ra
@@ -59,21 +61,50 @@ class Orbit:
         ra = a*(1-e)
         return ra
 
-    def get_oe_from_rv(r, v, meu):
+    # Finding Orbital Elements
+
+    def get_orbital_elements_from_rv(r, v, meu):
         angular_momentum = np.cross(r,v)
         line_o_nodes = np.cross(np.array([0, 0, 1]), angular_momentum)
-
         e, e_vector = Orbit.get_e_from_rv(r,v, meu)
-        a = Orbit.get_a_from_rv(r,v)
-        i = Orbit.get_i_from_rv(r,v)
-        raan = Orbit.get_raan_from_rv(r,v)
-        omega = Orbit.get_omega_from_rv(r,v)
-        theta = Orbit.get_theta_from_rv(r,v)  
 
-        oe = OrbitalElements(a, e, i, raan, omega, theta)
+        i = Orbit.get_i(angular_momentum)
+        raan = Orbit.get_raan(line_o_nodes)
+        arg_periapsis = Orbit.get_arg_periapsis(line_o_nodes, e_vector)
+        theta = Orbit.get_theta(r, e_vector)
+        a = Orbit.get_a(angular_momentum, e, meu)
+
+        oe = OrbitalElements(a, e, i, raan, arg_periapsis, theta)
         return oe
+    
+    def get_a(angular_momentum, e, meu):
+        if isinstance(angular_momentum, np.ndarray):
+            angular_momentum = np.linalg.norm(angular_momentum)
+        if isinstance(e, np.ndarray):
+            e = np.linalg.norm(e)
+        a = angular_momentum**2/(meu*(1-e^2))
+        return a
 
-    # Finding Orbital Elements
+    def get_theta(r, e_vector):
+        num = np.dot(e_vector, r)
+        denom = np.linalg.norm(e_vector)*np.linalg.norm(r)
+        theta = np.arccos(num/denom)
+        return theta
+
+    def get_arg_periapsis(line_o_nodes, e_vector):
+        num = np.dot(line_o_nodes, e_vector)
+        denom = np.linalg.norm(e_vector)*np.linalg.norm(line_o_nodes)
+        theta = np.arccos(num/denom)
+        return theta
+
+    def get_i(angular_momentum):
+        i = np.arccos(angular_momentum[2]/np.linalg.norm(angular_momentum))
+        return i
+
+    def get_raan(line_o_nodes):
+        raan = np.arccos(line_o_nodes[0]/np.linalg.norm(line_o_nodes))
+        return raan
+
     def get_e_from_rv(r,v, meu):
         """ Return eccentricity and eccentricity vector
         r (ndarray) - radius vector
@@ -89,5 +120,3 @@ class Orbit:
 
         return e, e_vector
 
-    def get_a_from_rv(r,v):
-        return None
