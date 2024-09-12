@@ -83,8 +83,10 @@ class Orbit:
         transform_matrix = R.perifocal_to_geocentric_matrix(self.orbital_elements.raan,
                                                             self.orbital_elements.omega,
                                                             self.orbital_elements.i)
-        self.r_vector = transform_matrix*np.transpose(r_perifocal)
-        self.v_vector = transform_matrix*np.transpose(v_perifocal)
+        self.r_vector = (transform_matrix*np.transpose(r_perifocal)
+                                                            )*r_perifocal.unit
+        self.v_vector = (transform_matrix*np.transpose(v_perifocal)
+                                                            )*v_perifocal.unit
 
 
     def get_p(e, a):
@@ -127,13 +129,17 @@ class Orbit:
         num = np.dot(e_vector, r)
         denom = np.linalg.norm(e_vector)*np.linalg.norm(r)
         theta = np.arccos(num/denom)
+        if num < 0:
+            theta = 2*np.pi*u.rad - theta
         return theta
 
     def get_arg_periapsis(line_o_nodes, e_vector):
         num = np.dot(line_o_nodes, e_vector)
         denom = np.linalg.norm(e_vector)*np.linalg.norm(line_o_nodes)
-        theta = np.arccos(num/denom)
-        return theta
+        omega = np.arccos(num/denom)
+        if e_vector[2] > 0:
+            omega = 2*np.pi*u.rad - omega
+        return omega
 
     def get_i(angular_momentum):
         i = np.arccos(angular_momentum[2]/np.linalg.norm(angular_momentum))
@@ -141,6 +147,8 @@ class Orbit:
 
     def get_raan(line_o_nodes):
         raan = np.arccos(line_o_nodes[0]/np.linalg.norm(line_o_nodes))
+        if line_o_nodes[1] < 0:
+            raan = 2*np.pi*u.rad - raan
         return raan
 
     def get_e_from_rv(r,v, meu):
@@ -160,12 +168,11 @@ class Orbit:
 
     # Finding Radius and Velocity Vectors
     def get_r_vector_perifocal(r_mag, theta):
-        print(r_mag)
-        print(theta)
-        r = np.array([r_mag.value*np.cos(theta), r_mag.value*np.sin(theta), 0])*r_mag.unit
+        r = np.matrix([r_mag.value*np.cos(theta), 
+                      r_mag.value*np.sin(theta), 0])*r_mag.unit
         return r
     
     def get_v_vector_perifocal(meu, p, theta, e):
-        v = np.sqrt(meu/p)*np.array([-np.sin(theta), (e+np.cos(theta)), 0])
+        v = np.sqrt(meu/p)*np.matrix([-np.sin(theta), (e+np.cos(theta)), 0])
         return v
 

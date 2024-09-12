@@ -12,6 +12,9 @@ MEU_EARTH = u.def_unit("meu Earth", 3.986e5*u.km**3/u.s**2)
 SPEC_E_EARTH = u.def_unit("Du^2/s^2", DU_EARTH**2/TU_EARTH**2)
 MOMENTUM_EARTH = u.def_unit("Du^2/s", DU_EARTH**2/TU_EARTH)
 
+du_tu = (MEU_EARTH**(1/2)/DU_EARTH**(1/2), DUTU_EARTH, 
+          lambda x: 1*x, lambda x: 1*x)
+
 AU_SUN = u.def_unit("Au Sun", 1.496e8*u.km) 
 TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d) 
 AUTU_SUN = u.def_unit("Au/Tu Sun", 29.784852*u.km/u.s) 
