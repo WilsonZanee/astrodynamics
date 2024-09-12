@@ -47,5 +47,5 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
 
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
-    r = p/(1+e*cos(theta))
+    r = p/(1+e*np.cos(theta))
     return r

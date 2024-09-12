@@ -1,6 +1,8 @@
 import numpy as np
+from astropy import units as u
 
 import two_body_util as util
+import coordinate_transforms as R
 
 
 class OrbitalElements:
@@ -15,6 +17,17 @@ class OrbitalElements:
 
     def set_true_anomaly(self, theta):
         self.theta = theta
+
+    def __str__(self):
+        string = (f"Semi-Major Axis: {self.a}\n"
+                f"Eccentricity: {self.e}\n"
+                f"Inclination: {self.i} = {(np.rad2deg(self.i)).to(u.deg)}\n"
+                f"RAAN: {self.raan} = {(np.rad2deg(self.raan)).to(u.deg)}\n"
+                f"Argument of Periapsis: {self.omega} = {(np.rad2deg(self.omega)).to(u.deg)}\n"
+                f"True Anomaly: {self.theta} = {(np.rad2deg(self.theta)).to(u.deg)}\n"
+        )
+        return string
+
 
 
 class Orbit:
@@ -37,6 +50,9 @@ class Orbit:
         if orbital_elements is None:
             if self.r_vector is not None and self.v_vector is not None:
                 self.get_attributes_rv()
+        elif orbital_elements is not None:
+            if self.r_vector is None and self.v_vector is None:
+                self.get_attributes_oe()
 
     def get_attributes_rv(self):
         self.angular_momentum = np.cross(self.r_vector, self.v_vector)
@@ -51,7 +67,29 @@ class Orbit:
         self.ra = Orbit.get_ra(self.a, self.eccentricity)
         self.rp = Orbit.get_rp(self.a, self.eccentricity)
 
-        self.orbital_elements = Orbit.get_orbital_elements_from_rv(self.r, self.v)
+        self.orbital_elements = Orbit.get_orbital_elements_from_rv(self.r_vector, self.v_vector, self.meu)
+
+    def get_attributes_oe(self):
+        self.p = Orbit.get_p(self.orbital_elements.e, self.orbital_elements.a) 
+        self.r_mag = util.orbit_radius_from_p_eccentricity_true_anomaly(self.orbital_elements.e,
+                                                                        self.p,
+                                                                        self.orbital_elements.theta)
+        r_perifocal = Orbit.get_r_vector_perifocal(self.r_mag, 
+                                                   self.orbital_elements.theta)
+        v_perifocal = Orbit.get_v_vector_perifocal(self.meu,
+                                                   self.p,
+                                                   self.orbital_elements.theta,
+                                                   self.orbital_elements.e)
+        transform_matrix = R.perifocal_to_geocentric_matrix(self.orbital_elements.raan,
+                                                            self.orbital_elements.omega,
+                                                            self.orbital_elements.i)
+        self.r_vector = transform_matrix*np.transpose(r_perifocal)
+        self.v_vector = transform_matrix*np.transpose(v_perifocal)
+
+
+    def get_p(e, a):
+        p  = a*(1-e**2)
+        return p
 
     def get_ra(a, e):
         ra = a*(1+e)
@@ -82,7 +120,7 @@ class Orbit:
             angular_momentum = np.linalg.norm(angular_momentum)
         if isinstance(e, np.ndarray):
             e = np.linalg.norm(e)
-        a = angular_momentum**2/(meu*(1-e^2))
+        a = angular_momentum**2/(meu*(1-e**2))
         return a
 
     def get_theta(r, e_vector):
@@ -116,7 +154,18 @@ class Orbit:
         r_scaler = v_mag**2 - meu/r_mag
         v_scaler = np.dot(r, v)
         e_vector = (1/meu)*(r_scaler*r - v_scaler*v)
-        e = np.linalg.norm(e)
+        e = np.linalg.norm(e_vector)
 
         return e, e_vector
+
+    # Finding Radius and Velocity Vectors
+    def get_r_vector_perifocal(r_mag, theta):
+        print(r_mag)
+        print(theta)
+        r = np.array([r_mag.value*np.cos(theta), r_mag.value*np.sin(theta), 0])*r_mag.unit
+        return r
+    
+    def get_v_vector_perifocal(meu, p, theta, e):
+        v = np.sqrt(meu/p)*np.array([-np.sin(theta), (e+np.cos(theta)), 0])
+        return v
 
