@@ -129,7 +129,7 @@ class Orbit:
         num = np.dot(e_vector, r)
         denom = np.linalg.norm(e_vector)*np.linalg.norm(r)
         theta = np.arccos(num/denom)
-        if num < 0:
+        if num > 0:
             theta = 2*np.pi*u.rad - theta
         return theta
 
@@ -137,7 +137,7 @@ class Orbit:
         num = np.dot(line_o_nodes, e_vector)
         denom = np.linalg.norm(e_vector)*np.linalg.norm(line_o_nodes)
         omega = np.arccos(num/denom)
-        if e_vector[2] > 0:
+        if e_vector[2] < 0:
             omega = 2*np.pi*u.rad - omega
         return omega
 
