@@ -2,6 +2,7 @@ from math import pi, sqrt, cos
 
 import poliastro
 from astropy import units as u
+from astropy.units.quantity import Quantity
 import numpy as np
 
 MU_EARTH = u.def_unit("Mu Earth", 5.972e24*u.kg) 
@@ -52,3 +53,28 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     r = p/(1+e*np.cos(theta))
     return r
+
+#************************ Time of Flight *************************
+def time_of_flight_kepler(e, meu, a, theta1, theta2, pass_periapsis=0):
+    E1 = get_eccentric_anomaly(e, theta1)
+    E2 = get_eccentric_anomaly(e, theta2)
+    n = np.sqrt(meu/a**3)
+
+    dt = (2*np.pi*pass_periapsis - (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
+    return dt
+
+
+def get_eccentric_anomaly(e, theta):
+    """ Returns Eccentric Anomaly
+    theta (rad) - true anomaly """
+    try:
+        if isinstance(theta.units, u.deg):
+            theta = theta.to(u.rad)
+    except:
+        pass
+    num = e + np.cos(theta)
+    denom = 1 + e*np.cos(theta)
+    E = np.arccos(num/denom)
+    if theta > np.pi:
+        E = 2*np.pi - E
+    return E
