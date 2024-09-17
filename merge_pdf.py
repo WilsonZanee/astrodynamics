@@ -9,6 +9,12 @@ from fpdf import FPDF
 
 
 def merge_pdfs(files):
+    dir = os.path.dirname(files[0])
+    basename = os.path.basename(files[0])
+    try:
+        Path(os.path.join(dir, "pdf_output")).mkdir()
+    except FileExistsError:
+        pass
     pdfs = []
     for file in files:
         ext = Path(file).suffix
@@ -25,13 +31,13 @@ def merge_pdfs(files):
         merger.append(pdf)
     dir = os.path.dirname(files[0])
     basename = os.path.basename(files[0])
-    pdf_path = os.path.join(dir, f"{basename}_merged.pdf")
+    pdf_path = os.path.join(dir, "pdf_output", f"{basename}_merged.pdf")
     merger.write(pdf_path)
 
 def convert_to_pdf(file):
     dir = os.path.dirname(file)
     basename = os.path.basename(file)
-    pdf_path = os.path.join(dir, f"{basename}.pdf")
+    pdf_path = os.path.join(dir, "pdf_output", f"{basename}.pdf")
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
