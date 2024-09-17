@@ -111,7 +111,7 @@ class Orbit:
         i = Orbit.get_i(angular_momentum)
         raan = Orbit.get_raan(line_o_nodes)
         arg_periapsis = Orbit.get_arg_periapsis(line_o_nodes, e_vector)
-        theta = Orbit.get_theta(r, e_vector)
+        theta = Orbit.get_theta(r, e_vector, v)
         a = Orbit.get_a(angular_momentum, e, meu)
 
         oe = OrbitalElements(a, e, i, raan, arg_periapsis, theta)
@@ -125,11 +125,11 @@ class Orbit:
         a = angular_momentum**2/(meu*(1-e**2))
         return a
 
-    def get_theta(r, e_vector):
+    def get_theta(r, e_vector, v_vector):
         num = np.dot(e_vector, r)
         denom = np.linalg.norm(e_vector)*np.linalg.norm(r)
         theta = np.arccos(num/denom)
-        if num > 0:
+        if np.dot(r,v_vector) < 0:
             theta = 2*np.pi*u.rad - theta
         return theta
 
