@@ -13,7 +13,7 @@ def perifocal_to_geocentric_matrix(raan, arg_o_periapsis, inclination):
     cord13 = sin(raan)*sin(i)
     cord21 = sin(raan)*cos(omega) + cos(raan)*sin(omega)*cos(i)
     cord22 = -sin(raan)*sin(omega) + cos(raan)*cos(omega)*cos(i)
-    cord23 = -cos(raan)*cos(i)
+    cord23 = -cos(raan)*sin(i)
     cord31 = sin(omega)*sin(i)
     cord32 = cos(omega)*sin(i)
     cord33 = cos(i)

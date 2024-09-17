@@ -10,7 +10,7 @@ from fpdf import FPDF
 
 def merge_pdfs(files):
     dir = os.path.dirname(files[0])
-    basename = os.path.basename(files[0])
+    basename = Path(files[0]).stem
     try:
         Path(os.path.join(dir, "pdf_output")).mkdir()
     except FileExistsError:
@@ -29,9 +29,8 @@ def merge_pdfs(files):
     merger = PdfMerger()
     for pdf in pdfs:
         merger.append(pdf)
-    dir = os.path.dirname(files[0])
-    basename = os.path.basename(files[0])
     pdf_path = os.path.join(dir, "pdf_output", f"{basename}_merged.pdf")
+    print(pdf_path)
     merger.write(pdf_path)
 
 def convert_to_pdf(file):
