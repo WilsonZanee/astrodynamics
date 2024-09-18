@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import cos, sin
 from astropy import units as u
 
 import two_body_util as util
@@ -27,8 +28,70 @@ class OrbitalElements:
                 f"True Anomaly: {self.theta} = {(np.rad2deg(self.theta)).to(u.deg)}\n"
         )
         return string
+    
+class RadarObservation:
+    earth_radius_vector = np.matrix([[0],[0],[1]])*util.DU_EARTH
+    earth_rotational_velo = 7.2921159e-5*u.rad/u.s
+    earth_rotation_velo_vector = np.matrix([[0], [0], 
+                                            [earth_rotational_velo.value]]
+                                            )*earth_rotational_velo.unit
+    def __init__(self, range, range_rate, az, az_rate, el, el_rate, lat=None,
+                 long=None, ref_zulu_theta=None, dt=None, ):
+        """
+        Input all angles in radians"""
+        self.range = range
+        self.range_rate = range_rate
+        self.az = az
+        self.az_rate = az_rate
+        self.el = el
+        self.el_rate = el_rate
 
 
+    def get_range_vector(self):
+        el = self.el.value
+        az = self.az.value
+        range = self.range.value
+        range_vector = np.matrix([[-range*cos(el)*cos(az)],
+                                  [range*cos(el)*sin(az)],
+                                  [range*sin(el)]])*self.range.unit
+        return range_vector
+    
+    def get_range_rate_vector(self):
+        el = self.el.value
+        el_rate = self.el_rate.value
+        az = self.az.value
+        az_rate = self.az_rate.value
+        range = self.range.value
+        range_rate = self.range_rate.value
+        s_component = (-range_rate*cos(el)*cos(az) 
+                        + range*sin(el)*el_rate*cos(az)
+                        + range*cos(el)*sin(az)*az_rate
+                        )
+        e_component = (range_rate*cos(el)*sin(az) 
+                        - range*sin(el)*el_rate*sin(az)
+                        + range*cos(el)*cos(az)*az_rate
+                        )
+        z_component = (range_rate*sin(el) 
+                       + range*cos(el)*el_rate 
+                        )
+        range_rate_vector = np.matrix([[s_component],
+                                  [e_component],
+                                  [z_component]])*self.range_rate.unit
+        return range_rate_vector
+    
+    def convert_range_vector_to_radius(range_vector):
+        #radius_vector = 
+        pass
+
+    def __str__(self):
+        string = (f"Range: {self.range}\n"
+                f"Range Rate: {self.range_rate}\n"
+                f"Azimuth: {self.az}\n"
+                f"Azimuth Rate: {self.az_rate}\n"
+                f"Elevation: {self.el}\n"
+                f"Elevation Rate: {self.el_rate}\n"
+        )
+        return string
 
 class Orbit:
     def __init__(self, r_vector=None, v_vector=None, meu=None, 
