@@ -84,8 +84,10 @@ class RadarObservation:
         return rad_vector
     
     def convert_rr_IJK_to_velo(rr_IJK, radius_IJK):
-        radius = np.squeeze(np.asarray(radius_IJK))
-        adj = np.cross(util.earth_rotation_velo_vector, radius)*rr_IJK.unit
+        radius = np.squeeze(np.asarray(radius_IJK))*radius_IJK.unit
+        omega = util.earth_rotation_velo_vector.to(u.rad/util.TU_EARTH)
+        adj = np.cross(omega.value, radius.value)*rr_IJK.unit
+        print(rr_IJK)
         print(adj)
         v = rr_IJK + adj
         return v
@@ -95,16 +97,19 @@ class RadarObservation:
         range_v = self.get_range_vector()
         range_rate_v = self.get_range_rate_vector()
         radius_SEZ = RadarObservation.convert_range_vector_to_radius(range_v)
+        print(f"RadiusSEZ: {radius_SEZ}")
 
         # Get D matrix
         local_sid_time = get_local_siderail_time(self.ref_zulu_sid_time, 
                                                  self.dt, 
-                                                 self.lat)
+                                                 self.long)
         D_matrix = topocentric_to_geocentrix_matrix(self.lat, local_sid_time)
+        print(f"D: {D_matrix}")
 
         # Convert to IJK
-        r = D_matrix*radius_SEZ*radius_SEZ.unit
-        range_rate_IJK = D_matrix*range_rate_v*range_rate_v.unit
+        r = np.squeeze(np.asarray(D_matrix*radius_SEZ))*radius_SEZ.unit
+        range_rate_IJK = np.squeeze(np.asarray(D_matrix*range_rate_v)
+                                    )*range_rate_v.unit
         v = RadarObservation.convert_rr_IJK_to_velo(range_rate_IJK, r)
 
         return (r, v)

@@ -39,9 +39,31 @@ def specific_energy_from_velo(velo, meu, radius):
     energy = ((velo**2)/2) - (meu/radius)
     return energy
 
+def specific_energy_from_rpra(rp, ra, meu):
+    energy = -meu / (ra + rp)
+    return energy.to(SPEC_E_EARTH)
+
 def angular_momentum_from_p(p, meu):
     momentum = np.sqrt(p*meu) 
     return momentum
+
+#*********************** Velo Calcs *******************************************
+
+def velo_from_energy(energy, meu, radius):
+    velo = np.sqrt(2*(energy + meu/radius))
+    return velo.to(DUTU_EARTH)
+
+def velo_from_radius(meu, radius, semi_major_axis):
+    velo = np.sqrt((2*meu/radius) - (meu/semi_major_axis))
+    return velo.to(DUTU_EARTH)
+
+def get_escape_velo(meu, radius):
+    velo = np.sqrt(2*meu/radius)
+    return velo.to(u.km/u.s)
+
+def get_hyperbolic_excess_speed(velo_burnout, velo_esc):
+    v_inf = np.sqrt(velo_burnout**2 + velo_esc**2)
+    return v_inf
 
 #************************ Orbital Elements ************************************
 def semi_major_axis_from_energy(energy, meu):

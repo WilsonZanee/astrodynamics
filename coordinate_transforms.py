@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import cos, sin
+from astropy import units as u
 
 import two_body_util as util
 
@@ -32,10 +33,14 @@ def topocentric_to_geocentrix_matrix(lat, local_siderial_t):
                    [-cos(lat), 0, sin(lat)]])
     return D
 
-def get_local_siderail_time(ref_zulu_siderial_time, dt, lat):
+def get_local_siderail_time(ref_zulu_siderial_time, dt, long):
     theta_go = util.ensure_rad(ref_zulu_siderial_time)
-    lat = util.ensure_rad(lat)
+    long = util.ensure_rad(long)
     local_sid_time = (theta_go 
                       + util.earth_rotational_velo*dt 
-                      + lat)
+                      + long)
+    print(f"Thetago: {theta_go.to(u.deg)}")
+    print(f"Thetag: {(util.earth_rotational_velo*dt).to(u.deg) }")
+    print(f"long: {long.to(u.deg)}")
+    print(f"Theta: {local_sid_time.to(u.deg)}")
     return local_sid_time
