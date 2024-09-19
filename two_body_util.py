@@ -24,7 +24,11 @@ MEU_SUN = u.def_unit("meu Sun", 1.3271544e11*u.km**3/u.s**2)
 spec_energy = u.km**2/u.s**2
 angular_momentum = u.km**2/u.s
 
+earth_radius_vector = np.matrix([[0],[0],[1]])*DU_EARTH
+earth_rotational_velo = 7.2921159e-5*u.rad/u.s
 
+earth_rotation_velo_vector = np.array([0, 0, earth_rotational_velo.value]
+                                        )*earth_rotational_velo.unit
 
 def elliptical_period(a, meu):
     period = 2*pi*a**(1.5) / sqrt(meu)
@@ -78,3 +82,26 @@ def get_eccentric_anomaly(e, theta):
     if theta > np.pi:
         E = 2*np.pi - E
     return E
+
+def ensure_rad(angle):
+    if isinstance(angle, Quantity):
+        if angle.unit == u.deg:
+            rad_angle = angle.to(u.rad)
+        elif angle.unit == u.rad:
+            rad_angle = angle
+        else:
+            try:
+                rad_angle = angle.to(u.rad)
+            except:
+                print(f"{angle} with unit {angle.unit} does not have "
+                      f"a valid unit type")
+    else:
+        rad_angle = angle*u.rad
+    return rad_angle
+
+
+
+def get_sec(time_str):
+    """Get seconds from time."""
+    h, m, s = time_str.split(':')
+    return int(h) * 3600 + int(m) * 60 + int(s)

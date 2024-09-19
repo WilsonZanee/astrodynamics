@@ -4,6 +4,8 @@ from astropy import units as u
 
 import two_body_util as util
 import coordinate_transforms as R
+from coordinate_transforms import get_local_siderail_time
+from coordinate_transforms import topocentric_to_geocentrix_matrix
 
 
 class OrbitalElements:
@@ -30,11 +32,6 @@ class OrbitalElements:
         return string
     
 class RadarObservation:
-    earth_radius_vector = np.matrix([[0],[0],[1]])*util.DU_EARTH
-    earth_rotational_velo = 7.2921159e-5*u.rad/u.s
-    earth_rotation_velo_vector = np.matrix([[0], [0], 
-                                            [earth_rotational_velo.value]]
-                                            )*earth_rotational_velo.unit
     def __init__(self, range, range_rate, az, az_rate, el, el_rate, lat=None,
                  long=None, ref_zulu_theta=None, dt=None, ):
         """
@@ -45,7 +42,10 @@ class RadarObservation:
         self.az_rate = az_rate
         self.el = el
         self.el_rate = el_rate
-
+        self.lat = lat
+        self.long = long
+        self.ref_zulu_sid_time = ref_zulu_theta
+        self.dt = dt
 
     def get_range_vector(self):
         el = self.el.value
@@ -80,8 +80,34 @@ class RadarObservation:
         return range_rate_vector
     
     def convert_range_vector_to_radius(range_vector):
-        #radius_vector = 
-        pass
+        rad_vector  = range_vector + util.earth_radius_vector 
+        return rad_vector
+    
+    def convert_rr_IJK_to_velo(rr_IJK, radius_IJK):
+        radius = np.squeeze(np.asarray(radius_IJK))
+        adj = np.cross(util.earth_rotation_velo_vector, radius)*rr_IJK.unit
+        print(adj)
+        v = rr_IJK + adj
+        return v
+
+    def get_vectors_in_geocentric_IJK(self):
+        # Get range vectors
+        range_v = self.get_range_vector()
+        range_rate_v = self.get_range_rate_vector()
+        radius_SEZ = RadarObservation.convert_range_vector_to_radius(range_v)
+
+        # Get D matrix
+        local_sid_time = get_local_siderail_time(self.ref_zulu_sid_time, 
+                                                 self.dt, 
+                                                 self.lat)
+        D_matrix = topocentric_to_geocentrix_matrix(self.lat, local_sid_time)
+
+        # Convert to IJK
+        r = D_matrix*radius_SEZ*radius_SEZ.unit
+        range_rate_IJK = D_matrix*range_rate_v*range_rate_v.unit
+        v = RadarObservation.convert_rr_IJK_to_velo(range_rate_IJK, r)
+
+        return (r, v)
 
     def __str__(self):
         string = (f"Range: {self.range}\n"
