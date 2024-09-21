@@ -1,5 +1,8 @@
 import numpy as np
 from numpy import cos, sin
+from astropy import units as u
+
+import two_body_util as util
 
 IJK = "ijk" # Geocentric
 SEZ = "sez" # Topocentric Horizon
@@ -21,3 +24,19 @@ def perifocal_to_geocentric_matrix(raan, arg_o_periapsis, inclination):
                    [cord21, cord22, cord23],
                    [cord31, cord32, cord33]])
     return r
+
+def topocentric_to_geocentrix_matrix(lat, local_siderial_t):
+    lat = util.ensure_rad(lat)
+    theta = util.ensure_rad(local_siderial_t)
+    D = np.matrix([[sin(lat)*cos(theta), -sin(theta), cos(lat)*cos(theta)],
+                   [sin(lat)*sin(theta), cos(theta), cos(lat)*sin(theta)],
+                   [-cos(lat), 0, sin(lat)]])
+    return D
+
+def get_local_siderail_time(ref_zulu_siderial_time, dt, long):
+    theta_go = util.ensure_rad(ref_zulu_siderial_time)
+    long = util.ensure_rad(long)
+    local_sid_time = (theta_go 
+                      + util.earth_rotational_velo*dt 
+                      + long)
+    return local_sid_time

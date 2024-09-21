@@ -1,8 +1,11 @@
 import numpy as np
+from numpy import cos, sin
 from astropy import units as u
 
 import two_body_util as util
 import coordinate_transforms as R
+from coordinate_transforms import get_local_siderail_time
+from coordinate_transforms import topocentric_to_geocentrix_matrix
 
 
 class OrbitalElements:
@@ -27,8 +30,95 @@ class OrbitalElements:
                 f"True Anomaly: {self.theta} = {(np.rad2deg(self.theta)).to(u.deg)}\n"
         )
         return string
+    
+class RadarObservation:
+    def __init__(self, range, range_rate, az, az_rate, el, el_rate, lat=None,
+                 long=None, ref_zulu_theta=None, dt=None, ):
+        """
+        Input all angles in radians"""
+        self.range = range
+        self.range_rate = range_rate
+        self.az = az
+        self.az_rate = az_rate
+        self.el = el
+        self.el_rate = el_rate
+        self.lat = lat
+        self.long = long
+        self.ref_zulu_sid_time = ref_zulu_theta
+        self.dt = dt
 
+    def get_range_vector(self):
+        el = self.el.value
+        az = self.az.value
+        range = self.range.value
+        range_vector = np.matrix([[-range*cos(el)*cos(az)],
+                                  [range*cos(el)*sin(az)],
+                                  [range*sin(el)]])*self.range.unit
+        return range_vector
+    
+    def get_range_rate_vector(self):
+        el = self.el.value
+        el_rate = self.el_rate.value
+        az = self.az.value
+        az_rate = self.az_rate.value
+        range = self.range.value
+        range_rate = self.range_rate.value
+        s_component = (-range_rate*cos(el)*cos(az) 
+                        + range*sin(el)*el_rate*cos(az)
+                        + range*cos(el)*sin(az)*az_rate
+                        )
+        e_component = (range_rate*cos(el)*sin(az) 
+                        - range*sin(el)*el_rate*sin(az)
+                        + range*cos(el)*cos(az)*az_rate
+                        )
+        z_component = (range_rate*sin(el) 
+                       + range*cos(el)*el_rate 
+                        )
+        range_rate_vector = np.matrix([[s_component],
+                                  [e_component],
+                                  [z_component]])*self.range_rate.unit
+        return range_rate_vector
+    
+    def convert_range_vector_to_radius(range_vector):
+        rad_vector  = range_vector + util.earth_radius_vector 
+        return rad_vector
+    
+    def convert_rr_IJK_to_velo(rr_IJK, radius_IJK):
+        radius = np.squeeze(np.asarray(radius_IJK))*radius_IJK.unit
+        omega = util.earth_rotation_velo_vector.to(u.rad/util.TU_EARTH)
+        adj = np.cross(omega.value, radius.value)*rr_IJK.unit
+        v = rr_IJK + adj
+        return v
 
+    def get_vectors_in_geocentric_IJK(self):
+        # Get range vectors
+        range_v = self.get_range_vector()
+        range_rate_v = self.get_range_rate_vector()
+        radius_SEZ = RadarObservation.convert_range_vector_to_radius(range_v)
+
+        # Get D matrix
+        local_sid_time = get_local_siderail_time(self.ref_zulu_sid_time, 
+                                                 self.dt, 
+                                                 self.long)
+        D_matrix = topocentric_to_geocentrix_matrix(self.lat, local_sid_time)
+
+        # Convert to IJK
+        r = np.squeeze(np.asarray(D_matrix*radius_SEZ))*radius_SEZ.unit
+        range_rate_IJK = np.squeeze(np.asarray(D_matrix*range_rate_v)
+                                    )*range_rate_v.unit
+        v = RadarObservation.convert_rr_IJK_to_velo(range_rate_IJK, r)
+
+        return (r, v)
+
+    def __str__(self):
+        string = (f"Range: {self.range}\n"
+                f"Range Rate: {self.range_rate}\n"
+                f"Azimuth: {self.az}\n"
+                f"Azimuth Rate: {self.az_rate}\n"
+                f"Elevation: {self.el}\n"
+                f"Elevation Rate: {self.el_rate}\n"
+        )
+        return string
 
 class Orbit:
     def __init__(self, r_vector=None, v_vector=None, meu=None, 
