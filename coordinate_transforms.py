@@ -39,8 +39,4 @@ def get_local_siderail_time(ref_zulu_siderial_time, dt, long):
     local_sid_time = (theta_go 
                       + util.earth_rotational_velo*dt 
                       + long)
-    print(f"Thetago: {theta_go.to(u.deg)}")
-    print(f"Thetag: {(util.earth_rotational_velo*dt).to(u.deg) }")
-    print(f"long: {long.to(u.deg)}")
-    print(f"Theta: {local_sid_time.to(u.deg)}")
     return local_sid_time

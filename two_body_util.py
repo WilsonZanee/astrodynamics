@@ -10,8 +10,8 @@ DU_EARTH = u.def_unit("Du Earth", 6379.1*u.km)
 TU_EARTH = u.def_unit("Tu Earth", 806.8*u.s) 
 DUTU_EARTH = u.def_unit("Du/Tu Earth", 7.9053661*u.km/u.s) 
 MEU_EARTH = u.def_unit("meu Earth", 3.986e5*u.km**3/u.s**2)
-SPEC_E_EARTH = u.def_unit("Du^2/s^2", DU_EARTH**2/TU_EARTH**2)
-MOMENTUM_EARTH = u.def_unit("Du^2/s", DU_EARTH**2/TU_EARTH)
+SPEC_E_EARTH = u.def_unit("Du^2/Tu^2", DU_EARTH**2/TU_EARTH**2)
+MOMENTUM_EARTH = u.def_unit("Du^2/Tu", DU_EARTH**2/TU_EARTH)
 
 du_tu = (MEU_EARTH**(1/2)/DU_EARTH**(1/2), DUTU_EARTH, 
           lambda x: 1*x, lambda x: 1*x)
@@ -47,6 +47,10 @@ def angular_momentum_from_p(p, meu):
     momentum = np.sqrt(p*meu) 
     return momentum
 
+def angular_momentum_from_periapsis(vp, rp):
+    h = vp*rp
+    return h
+
 #*********************** Velo Calcs *******************************************
 
 def velo_from_energy(energy, meu, radius):
@@ -61,8 +65,17 @@ def get_escape_velo(meu, radius):
     velo = np.sqrt(2*meu/radius)
     return velo.to(u.km/u.s)
 
+def get_plane_change_dv(v1, v2, di):
+    di = ensure_rad(di)
+#    v1sqr = v1**2
+#    v2sqr = v2**2
+#    negterm = -2*v1*v2*cos(di.value)
+#    dv = np.sqrt(v1sqr + v2sqr + negterm)
+    dv = np.sqrt(v1**2 + v2**2 - 2*v1*v2*cos(di.value))
+    return dv
+
 def get_hyperbolic_excess_speed(velo_burnout, velo_esc):
-    v_inf = np.sqrt(velo_burnout**2 + velo_esc**2)
+    v_inf = np.sqrt(velo_burnout**2 - velo_esc**2)
     return v_inf
 
 #************************ Orbital Elements ************************************
@@ -73,7 +86,6 @@ def semi_major_axis_from_energy(energy, meu):
 def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
     e = sqrt(1 + (2*angular_momentum**2*energy/meu**2))
     return e
-
 
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
