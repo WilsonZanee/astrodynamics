@@ -63,6 +63,22 @@ def time_of_flight_kepler(e, meu, a, theta1, theta2, pass_periapsis=0):
     dt = (2*np.pi*pass_periapsis - (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
+def predict_location(e, a, theta1, dt, pass_periapsis, meu):
+    n = np.sqrt(meu/a**3)
+    M_init = n*dt - 2*pass_periapsis*np.pi + theta1
+    guess_E = 0.5
+    last_E = np.pi
+    margin = 0.001
+    while abs(last_E - guess_E) > margin:
+        M_current = guess_E - e*np.sin(guess_E)
+        delta_E = M_init - M_current / (1 - e*np.cos(guess_E))
+        last_E = guess_E
+        guess_E = guess_E + delta_E
+        print(f"Guess E: {guess_E}")
+        print(f"dm/de: {delta_E}")
+    theta2 = np.arccos((np.cos(guess_E) - e)/(1-e*np.cos(guess_E)))
+
+    return theta2
 
 def get_eccentric_anomaly(e, theta):
     """ Returns Eccentric Anomaly
