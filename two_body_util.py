@@ -77,8 +77,14 @@ def predict_location(e, a, theta1, dt, pass_periapsis, meu):
         print(f"Guess E: {guess_E}")
         print(f"dm/de: {delta_E}")
     theta2 = np.arccos((np.cos(guess_E) - e)/(1-e*np.cos(guess_E)))
-
     return theta2
+
+def time_of_flight_universal_var(r_init, v_init):
+
+    tof = 0
+    r_final = 0
+    v_final = 0
+    return (tof, r_final, v_final)
 
 def get_eccentric_anomaly(e, theta):
     """ Returns Eccentric Anomaly
