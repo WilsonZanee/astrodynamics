@@ -59,26 +59,33 @@ def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
     E1 = get_eccentric_anomaly(e, theta1).value
     E2 = get_eccentric_anomaly(e, theta2).value
     n = np.sqrt(meu/a**3)
-    print(n)
 
     dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
 def predict_location(e, a, theta1, dt, pass_periapsis, meu):
     n = np.sqrt(meu/a**3)
-    M_init = n*dt - 2*pass_periapsis*np.pi + theta1
+    E_o = get_eccentric_anomaly(e, theta1).value
+    M_init = n.value*dt.value - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
     guess_E = 0.5
     last_E = np.pi
-    margin = 0.001
+    margin = 0.000001
     while abs(last_E - guess_E) > margin:
         M_current = guess_E - e*np.sin(guess_E)
-        delta_E = M_init - M_current / (1 - e*np.cos(guess_E))
+        M_diff = M_init - M_current
+        dMdE = 1 - e*np.cos(guess_E)
+        dE = M_diff / dMdE
         last_E = guess_E
-        guess_E = guess_E + delta_E
-        print(f"Guess E: {guess_E}")
-        print(f"dm/de: {delta_E}")
-    theta2 = np.arccos((np.cos(guess_E) - e)/(1-e*np.cos(guess_E)))
-    return theta2
+        guess_E = guess_E + dE
+
+        print(f"En (rad): {last_E}")
+        print(f"M-Mn: {M_diff}")
+        print(f"dM/dE: {dMdE}")
+        print(f"En+1: {guess_E}")
+        print(abs(last_E - guess_E))
+    theta2 = np.arccos((np.cos(guess_E) - e) / (1 - e*np.cos(guess_E)))
+    theta2 = 2*np.pi - theta2
+    return theta2*u.rad
 
 def time_of_flight_universal_var(r_init, v_init):
 
