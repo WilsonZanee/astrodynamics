@@ -55,12 +55,13 @@ def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     return r
 
 #************************ Time of Flight *************************
-def time_of_flight_kepler(e, meu, a, theta1, theta2, pass_periapsis=0):
-    E1 = get_eccentric_anomaly(e, theta1)
-    E2 = get_eccentric_anomaly(e, theta2)
+def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
+    E1 = get_eccentric_anomaly(e, theta1).value
+    E2 = get_eccentric_anomaly(e, theta2).value
     n = np.sqrt(meu/a**3)
+    print(n)
 
-    dt = (2*np.pi*pass_periapsis - (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
+    dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
 def predict_location(e, a, theta1, dt, pass_periapsis, meu):
@@ -90,13 +91,13 @@ def get_eccentric_anomaly(e, theta):
     """ Returns Eccentric Anomaly
     theta (rad) - true anomaly """
     try:
-        if isinstance(theta.units, u.deg):
+        if theta.unit == "deg":
             theta = theta.to(u.rad)
     except:
         pass
     num = e + np.cos(theta)
     denom = 1 + e*np.cos(theta)
     E = np.arccos(num/denom)
-    if theta > np.pi:
-        E = 2*np.pi - E
-    return E
+    if theta.value > np.pi:
+        E = 2*np.pi - E.value
+    return E*u.rad
