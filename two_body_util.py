@@ -95,14 +95,18 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
     spec_energy = specific_energy_from_velo(v0, meu, r0).to(SPEC_E_EARTH)
     a = semi_major_axis_from_energy(spec_energy, meu).to(DU_EARTH)
     r_dot_v = np.dot(r_init, v_init).to(MOMENTUM_EARTH)
+    if a > 0:
+        x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
+    if a < 0:
+        x_guess = 5*DU_EARTH**(1/2)
 
-    x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
-    
-    print(f"r0: {r0}")
-    print(f"v0: {v0}")
-    print(f"energy: {spec_energy}")
-    print(f"a: {a}")
-    print(f"r.v: {r_dot_v}")
+    x_list = []
+    z_list = []
+    S_list = []
+    C_list = []
+    time_list = []
+    dt_list = []
+    dtdx_list = []
 
     if SandC:
         if a > 0:
@@ -112,6 +116,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
         if abs(get_z(x_guess, a)) < 1e-7:
             SandC_func = get_SandC_parabolic
 
+        print(SandC_func)
         counter = 0
 
         #while True:
@@ -121,32 +126,40 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
             t = get_time_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu) 
             t_diff = dt - t
             r = get_r_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu)
+            dtdx = r / np.sqrt(meu)
+            old_x = x_guess
+            
+            x_list.append(old_x.value)
+            z_list.append(z)
+            S_list.append(S)
+            C_list.append(C)
+            time_list.append(t.value)
+            dt_list.append(t_diff.value)
+            dtdx_list.append(dtdx.value)    
+
             if abs(t_diff).value < margin:
                 x = x_guess
                 break
-            dtdx = r / np.sqrt(meu)
-            old_x = x_guess
             x_guess = x_guess + t_diff/dtdx
-            printout = {
-                "x": [old_x.value],
-                "z": [z],
-                "S": [S],
-                "C": [C],
-                "time": [t.value],
-                "dt": [t_diff.value],
-                "dt/dx": [dtdx.value]
-            }
-            df = pd.DataFrame(printout, index=[0])
-            print(df)          
             counter = counter + 1
-    
+    printout = {
+    "x": x_list,
+    "z": z_list,
+    "S": S_list,
+    "C": C_list,
+    "time": time_list,
+    "dt": dt_list,
+    "dt/dx": dtdx_list
+    }
+    df = pd.DataFrame(printout)
+    print(df) 
     print(f"x_final: {x}")
-    f_and_g = get_fg(meu, a, r0, r, x, r_dot_v)
+    f, g, f_dot, g_dot = get_fg(meu, a, r0, r, x, r_dot_v)
 
-    tof = 0
-    r_final = 0
-    v_final = 0
-    return (tof, r_final, v_final)
+    r_final = f * r_init + g * v_init
+    v_final = f_dot * r_init + g_dot * v_init
+
+    return (r_final, v_final)
 
 # S and C variation Function
 def get_SandC_elliptical(z):
@@ -194,9 +207,10 @@ def get_fg(meu, a, r_o, r, x, r_dot_v):
     g1 = (a**2) / (np.sqrt(a*meu))
     g2 = (r_dot_v / np.sqrt(a*meu)) * (1 - np.cos((x / np.sqrt(a)).value))
     g3 = (r_o / a) * np.sin((x / np.sqrt(a)).value)
-    g = g1 * (g2 + g3)
+    g = (g1 * (g2 + g3)).to(TU_EARTH)
 
-    f_dot = (-np.sqrt(meu * a) / (r * r_o)) * np.sin((x / np.sqrt(a)).value)
+    f_dot = ((-np.sqrt(meu * a) / (r * r_o)) * np.sin((x / np.sqrt(a)).value))\
+        .to(1/TU_EARTH)
 
     g_dot = 1 - (a / r) + (a / r) * np.cos((x / np.sqrt(a)).value)
 
@@ -206,7 +220,7 @@ def get_fg(meu, a, r_o, r, x, r_dot_v):
             "g_dot": g_dot}
 
     print(vars)
-    return vars
+    return (f, g, f_dot, g_dot)
 
 def get_z(x, a):
     z = x**2 / a
