@@ -64,31 +64,45 @@ def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
     dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
-def predict_location(e, a, theta1, dt, pass_periapsis, meu):
+def predict_location(e, a, theta1, dt, pass_periapsis, 
+                     meu, guess_E=2):
     n = np.sqrt(meu/a**3)
     E_o = get_eccentric_anomaly(e, theta1).value
-    M_init = n.value*dt.value - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
-    guess_E = 0.5
+    M_init = n*dt - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
     last_E = np.pi
     margin = 0.000001
+    e_list = []
+    M_diff_list = []
+    dMdE_list = []
+    eNew_list = []
+    print(guess_E)
     while abs(last_E - guess_E) > margin:
-        M_current = guess_E - e*np.sin(guess_E)
+        M_current = guess_E - e*np.sin(guess_E*u.rad)
         M_diff = M_init - M_current
-        dMdE = 1 - e*np.cos(guess_E)
+        dMdE = 1 - e*np.cos(guess_E*u.rad)
         dE = M_diff / dMdE
         last_E = guess_E
         guess_E = guess_E + dE
 
-        print(f"En (rad): {last_E}")
-        print(f"M-Mn: {M_diff}")
-        print(f"dM/dE: {dMdE}")
-        print(f"En+1: {guess_E}")
-        print(abs(last_E - guess_E))
-    theta2 = np.arccos((np.cos(guess_E) - e) / (1 - e*np.cos(guess_E)))
-    theta2 = 2*np.pi - theta2
+        e_list.append(last_E)
+        M_diff_list.append(M_diff)
+        dMdE_list.append(dMdE)
+        eNew_list.append(guess_E)
+    
+    printout = {
+    "En": e_list,
+    "M-Mn": M_diff_list,
+    "dM/dE": dMdE_list,
+    "En+1": eNew_list
+    }
+    df = pd.DataFrame(printout)
+    print(df) 
+    theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
+    theta2 = 2*np.pi - theta2.value
     return theta2*u.rad
 
-def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
+def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
+                                 max_iter=30, hyperbolic_guess=2):
     margin = 1e-7
     r0 = np.linalg.norm(r_init).to(DU_EARTH)
     v0 = np.linalg.norm(v_init).to(DUTU_EARTH)
@@ -98,7 +112,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
     if a > 0:
         x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
     if a < 0:
-        x_guess = 5*DU_EARTH**(1/2)
+        x_guess = hyperbolic_guess*DU_EARTH**(1/2)
 
     x_list = []
     z_list = []
@@ -120,7 +134,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
         counter = 0
 
         #while True:
-        while counter < 15:
+        while counter < max_iter:
             z = get_z(x_guess, a).value
             S, C = SandC_func(z)
             t = get_time_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu) 
@@ -144,17 +158,17 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
             counter = counter + 1
     printout = {
     "x": x_list,
-    "z": z_list,
-    "S": S_list,
-    "C": C_list,
-    "time": time_list,
+#    "z": z_list,
+#    "S": S_list,
+#    "C": C_list,
+#    "time": time_list,
     "dt": dt_list,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
     print(df) 
     print(f"x_final: {x}")
-    f, g, f_dot, g_dot = get_fg(meu, a, r0, r, x, r_dot_v)
+    f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = f * r_init + g * v_init
     v_final = f_dot * r_init + g_dot * v_init
@@ -201,25 +215,17 @@ def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
 
     return r
 
-def get_fg(meu, a, r_o, r, x, r_dot_v):
-    f = 1 - (a / r_o) * (1 - np.cos((x / np.sqrt(a)).value))
-
-    g1 = (a**2) / (np.sqrt(a*meu))
-    g2 = (r_dot_v / np.sqrt(a*meu)) * (1 - np.cos((x / np.sqrt(a)).value))
-    g3 = (r_o / a) * np.sin((x / np.sqrt(a)).value)
-    g = (g1 * (g2 + g3)).to(TU_EARTH)
-
-    f_dot = ((-np.sqrt(meu * a) / (r * r_o)) * np.sin((x / np.sqrt(a)).value))\
-        .to(1/TU_EARTH)
-
-    g_dot = 1 - (a / r) + (a / r) * np.cos((x / np.sqrt(a)).value)
+def get_fg(meu, x, z, S, C, r0, r, t):
+    f = 1 - (x**2 / r0) * C
+    g = (t - (x**3 / np.sqrt(meu)) * S).to(TU_EARTH)
+    f_dot = (((np.sqrt(meu) * x) / (r0 * r)) * ((z * S) - 1)).to(1/TU_EARTH)
+    g_dot = 1 - (x**2 / r) * C
 
     vars = {"f": f,
             "g": g,
             "f_dot": f_dot,
             "g_dot": g_dot}
 
-    print(vars)
     return (f, g, f_dot, g_dot)
 
 def get_z(x, a):
