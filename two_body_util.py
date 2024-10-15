@@ -89,7 +89,7 @@ def predict_location(e, a, theta1, dt, pass_periapsis, meu):
     return theta2*u.rad
 
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
-    margin = 0.0001
+    margin = 1e-7
     r0 = np.linalg.norm(r_init).to(DU_EARTH)
     v0 = np.linalg.norm(v_init).to(DUTU_EARTH)
     spec_energy = specific_energy_from_velo(v0, meu, r0).to(SPEC_E_EARTH)
@@ -97,7 +97,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
     r_dot_v = np.dot(r_init, v_init).to(MOMENTUM_EARTH)
 
     x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
-
+    
     print(f"r0: {r0}")
     print(f"v0: {v0}")
     print(f"energy: {spec_energy}")
@@ -109,31 +109,39 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True):
             SandC_func = get_SandC_elliptical
         elif a < 0: 
             SandC_func = get_SandC_hyperbolic
-        if abs(get_z(x_guess, a)) < 0.001:
+        if abs(get_z(x_guess, a)) < 1e-7:
             SandC_func = get_SandC_parabolic
 
         counter = 0
 
         #while True:
-        while counter < 5:
-            print(f"x: {x_guess}")
+        while counter < 15:
             z = get_z(x_guess, a).value
-            print(f"z: {z}")
             S, C = SandC_func(z)
-            print(f"S,C: {S}, {C}")
             t = get_time_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu) 
-            print(f"t: {t}")           
             t_diff = dt - t
-            print(f"tdiff: {t_diff}")
+            r = get_r_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu)
             if abs(t_diff).value < margin:
                 x = x_guess
                 break
-            r = get_r_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu)
             dtdx = r / np.sqrt(meu)
+            old_x = x_guess
             x_guess = x_guess + t_diff/dtdx
+            printout = {
+                "x": [old_x.value],
+                "z": [z],
+                "S": [S],
+                "C": [C],
+                "time": [t.value],
+                "dt": [t_diff.value],
+                "dt/dx": [dtdx.value]
+            }
+            df = pd.DataFrame(printout, index=[0])
+            print(df)          
             counter = counter + 1
-
+    
     print(f"x_final: {x}")
+    f_and_g = get_fg(meu, a, r0, r, x, r_dot_v)
 
     tof = 0
     r_final = 0
@@ -164,13 +172,13 @@ def get_SandC_parabolic(z):
     C = calc_z_series(z, exponent, sign, denom_C, min_stop)
     return (S, C)
 
-def get_time_from_SandC(x, z, S, C, r_mag, r_dot_v, meu):
-    term1 = x**3 * S
-    term2 = (r_dot_v / np.sqrt(meu)) * x**2 * C
-    term3 = r_mag * x * (1 - (z*S))
+def get_time_from_SandC(x, z, S, C, r0, r_dot_v, meu):
+    term1 = (x**3) * S
+    term2 = (r_dot_v / np.sqrt(meu)) * (x**2) * C
+    term3 = r0 * x * (1 - (z*S))
     time = (term1 + term2 + term3) / np.sqrt(meu)
 
-    return time
+    return time.to(TU_EARTH)
 
 def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
     term1 = x**2 * C
@@ -179,6 +187,26 @@ def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
     r = term1 + term2 + term3
 
     return r
+
+def get_fg(meu, a, r_o, r, x, r_dot_v):
+    f = 1 - (a / r_o) * (1 - np.cos((x / np.sqrt(a)).value))
+
+    g1 = (a**2) / (np.sqrt(a*meu))
+    g2 = (r_dot_v / np.sqrt(a*meu)) * (1 - np.cos((x / np.sqrt(a)).value))
+    g3 = (r_o / a) * np.sin((x / np.sqrt(a)).value)
+    g = g1 * (g2 + g3)
+
+    f_dot = (-np.sqrt(meu * a) / (r * r_o)) * np.sin((x / np.sqrt(a)).value)
+
+    g_dot = 1 - (a / r) + (a / r) * np.cos((x / np.sqrt(a)).value)
+
+    vars = {"f": f,
+            "g": g,
+            "f_dot": f_dot,
+            "g_dot": g_dot}
+
+    print(vars)
+    return vars
 
 def get_z(x, a):
     z = x**2 / a
