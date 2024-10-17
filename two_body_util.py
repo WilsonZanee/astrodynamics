@@ -1,9 +1,10 @@
-from math import pi, sqrt, cos
+from math import pi, sqrt, cos, factorial
 
 import poliastro
 from astropy import units as u
 from astropy.units.quantity import Quantity
 import numpy as np
+import pandas as pd
 
 MU_EARTH = u.def_unit("Mu Earth", 5.972e24*u.kg) 
 DU_EARTH = u.def_unit("Du Earth", 6379.1*u.km) 
@@ -93,29 +94,215 @@ def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     return r
 
 #************************ Time of Flight *************************
-def time_of_flight_kepler(e, meu, a, theta1, theta2, pass_periapsis=0):
-    E1 = get_eccentric_anomaly(e, theta1)
-    E2 = get_eccentric_anomaly(e, theta2)
-    n = np.sqrt(meu/a**3)
+def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
+    E1 = get_eccentric_anomaly(e, theta1).value
+    E2 = get_eccentric_anomaly(e, theta2).value
+    n = np.sqrt(meu/(a.to(DU_EARTH))**3).to(1/u.s)
 
-    dt = (2*np.pi*pass_periapsis - (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
+    dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
+def predict_location(e, a, theta1, dt, pass_periapsis, 
+                     meu, guess_E=2):
+    n = np.sqrt(meu/a**3)
+    E_o = get_eccentric_anomaly(e, theta1).value
+    M_init = n*dt - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
+    last_E = np.pi
+    margin = 0.000001
+    e_list = []
+    M_diff_list = []
+    dMdE_list = []
+    eNew_list = []
+    while abs(last_E - guess_E) > margin:
+        M_current = guess_E - e*np.sin(guess_E*u.rad)
+        M_diff = M_init - M_current
+        dMdE = 1 - e*np.cos(guess_E*u.rad)
+        dE = M_diff / dMdE
+        last_E = guess_E
+        guess_E = guess_E + dE
 
+        e_list.append(last_E)
+        M_diff_list.append(M_diff)
+        dMdE_list.append(dMdE)
+        eNew_list.append(guess_E)
+    
+    printout = {
+    "En": e_list,
+    "M-Mn": M_diff_list,
+    "dM/dE": dMdE_list,
+    "En+1": eNew_list
+    }
+    df = pd.DataFrame(printout)
+    print(df) 
+    theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
+    theta2 = 2*np.pi - theta2.value
+    return theta2*u.rad
+
+def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
+                                 max_iter=30, hyperbolic_guess=2):
+    margin = 1e-7
+    r0 = np.linalg.norm(r_init).to(DU_EARTH)
+    v0 = np.linalg.norm(v_init).to(DUTU_EARTH)
+    spec_energy = specific_energy_from_velo(v0, meu, r0).to(SPEC_E_EARTH)
+    a = semi_major_axis_from_energy(spec_energy, meu).to(DU_EARTH)
+    r_dot_v = np.dot(r_init, v_init).to(MOMENTUM_EARTH)
+    if a > 0:
+        x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
+    if a < 0:
+        x_guess = hyperbolic_guess*DU_EARTH**(1/2)
+
+    x_list = []
+    z_list = []
+    S_list = []
+    C_list = []
+    time_list = []
+    dt_list = []
+    dtdx_list = []
+
+    if SandC:
+        if a > 0:
+            SandC_func = get_SandC_elliptical
+        elif a < 0: 
+            SandC_func = get_SandC_hyperbolic
+        if abs(get_z(x_guess, a)) < 1e-7:
+            SandC_func = get_SandC_parabolic
+        counter = 0
+
+        #while True:
+        while counter < max_iter:
+            z = get_z(x_guess, a).value
+            S, C = SandC_func(z)
+            t = get_time_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu) 
+            t_diff = dt - t
+            r = get_r_from_SandC(x_guess, z, S, C, r0, r_dot_v, meu)
+            dtdx = r / np.sqrt(meu)
+            old_x = x_guess
+            
+            x_list.append(old_x.value)
+            z_list.append(z)
+            S_list.append(S)
+            C_list.append(C)
+            time_list.append(t.value)
+            dt_list.append(t_diff.value)
+            dtdx_list.append(dtdx.value)    
+
+            if abs(t_diff).value < margin:
+                x = x_guess
+                break
+            x_guess = x_guess + t_diff/dtdx
+            counter = counter + 1
+    printout = {
+    "x": x_list,
+#    "z": z_list,
+#    "S": S_list,
+#    "C": C_list,
+#    "time": time_list,
+    "dt": dt_list,
+    "dt/dx": dtdx_list
+    }
+    df = pd.DataFrame(printout)
+    print(df) 
+    f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
+
+    r_final = f * r_init + g * v_init
+    v_final = f_dot * r_init + g_dot * v_init
+
+    return (r_final, v_final)
+
+# S and C variation Function
+def get_SandC_elliptical(z):
+    root_z = np.sqrt(z)
+    S = (root_z - np.sin(root_z)) / np.sqrt(z**3)
+    C = (1 - np.cos(root_z)) / z
+    return (S, C)
+
+def get_SandC_hyperbolic(z):
+    neg_root_z = np.sqrt(-z)
+    S = (np.sinh(neg_root_z) - neg_root_z) / np.sqrt((-z)**3)
+    C = (1 - np.cosh(neg_root_z)) / z
+    return (S, C)
+
+def get_SandC_parabolic(z):
+    min_stop = 0.000001
+    exponent = 0
+    sign = 1
+    denom_S = 3
+    denom_C = 2
+
+    S = calc_z_series(z, exponent, sign, denom_S, min_stop)
+    C = calc_z_series(z, exponent, sign, denom_C, min_stop)
+    return (S, C)
+
+def get_time_from_SandC(x, z, S, C, r0, r_dot_v, meu):
+    term1 = (x**3) * S
+    term2 = (r_dot_v / np.sqrt(meu)) * (x**2) * C
+    term3 = r0 * x * (1 - (z*S))
+    time = (term1 + term2 + term3) / np.sqrt(meu)
+
+    return time.to(TU_EARTH)
+
+def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
+    term1 = x**2 * C
+    term2 = (r_dot_v/np.sqrt(meu))*x*(1-(z*S))
+    term3 = r0*(1 - (z*C))
+    r = term1 + term2 + term3
+
+    return r
+
+def get_fg(meu, x, z, S, C, r0, r, t):
+    f = 1 - (x**2 / r0) * C
+    g = (t - (x**3 / np.sqrt(meu)) * S).to(TU_EARTH)
+    f_dot = (((np.sqrt(meu) * x) / (r0 * r)) * ((z * S) - 1)).to(1/TU_EARTH)
+    g_dot = 1 - (x**2 / r) * C
+
+    vars = {"f": f,
+            "g": g,
+            "f_dot": f_dot,
+            "g_dot": g_dot}
+
+    return (f, g, f_dot, g_dot)
+
+def get_z(x, a):
+    z = x**2 / a
+    return z
+
+# Universal Variable Normal Functions
+def get_time_universal_var(r_mag, r_dot_v, meu, a, x):
+    term1 = a*(x - np.sqrt(a)*np.sin(x/np.sqrt(a)))
+    term2 = (r_dot_v/np.sqrt(meu))*a*(1 - np.cos(x/np.sqrt(a)))
+    term3 = r_mag*np.sqrt(a)*np.sin(x/np.sqrt(a))
+    t = (term1 + term2 + term3)/np.sqrt(meu)
+    return t
+
+# Misc
 def get_eccentric_anomaly(e, theta):
     """ Returns Eccentric Anomaly
     theta (rad) - true anomaly """
     try:
-        if isinstance(theta.units, u.deg):
+        if theta.unit == "deg":
             theta = theta.to(u.rad)
     except:
         pass
     num = e + np.cos(theta)
     denom = 1 + e*np.cos(theta)
     E = np.arccos(num/denom)
-    if theta > np.pi:
-        E = 2*np.pi - E
-    return E
+    if theta.value > np.pi:
+        E = 2*np.pi - E.value
+    return E*u.rad
+
+def calc_z_series(z, exponent, sign, denom, min):
+    array = []
+    hit_min = False
+    while not hit_min:
+        new_term = sign*(z**exponent)/factorial(denom)
+        array.append(new_term)
+        if new_term < min:
+            hit_min = True
+        sign = sign * -1
+        denom = denom + 2
+        exponent = exponent + 1
+    sum = pd.Series(array).sum()
+    return sum
 
 def ensure_rad(angle):
     if isinstance(angle, Quantity):
