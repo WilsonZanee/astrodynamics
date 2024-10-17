@@ -59,7 +59,7 @@ def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
     E1 = get_eccentric_anomaly(e, theta1).value
     E2 = get_eccentric_anomaly(e, theta2).value
-    n = np.sqrt(meu/a**3)
+    n = np.sqrt(meu/(a.to(DU_EARTH))**3).to(1/u.s)
 
     dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
@@ -75,7 +75,6 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     M_diff_list = []
     dMdE_list = []
     eNew_list = []
-    print(guess_E)
     while abs(last_E - guess_E) > margin:
         M_current = guess_E - e*np.sin(guess_E*u.rad)
         M_diff = M_init - M_current
@@ -129,8 +128,6 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
             SandC_func = get_SandC_hyperbolic
         if abs(get_z(x_guess, a)) < 1e-7:
             SandC_func = get_SandC_parabolic
-
-        print(SandC_func)
         counter = 0
 
         #while True:
@@ -167,7 +164,6 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     }
     df = pd.DataFrame(printout)
     print(df) 
-    print(f"x_final: {x}")
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = f * r_init + g * v_init
