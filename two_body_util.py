@@ -266,6 +266,48 @@ def get_z(x, a):
     z = x**2 / a
     return z
 
+# Gauss' Problem
+
+def get_velo_gauss_problem(r1, r2, meu, zguess=(2*np.pi)**2):
+    r1_0 = np.linalg.norm(r1)
+    r2_0 = np.linalg.norm(r2)
+    theta_short = np.arccos(np.dot(r1, r2) / (r1_0 * r2_0))
+    theta_long = 2*np.pi - theta_short
+    thetas = [theta_short, theta_long]
+
+    if zguess > 0:
+        SandC_func = get_SandC_elliptical
+    elif zguess < 0: 
+        SandC_func = get_SandC_hyperbolic
+    if abs(zguess) < 1e-7:
+        SandC_func = get_SandC_parabolic
+
+    for d_theta in thetas:
+        A = get_A(r1_0, r2_0, d_theta)
+        S, C = SandC_func(zguess)
+        y, x = get_xy_gauss_problem(r1_0, r2_0, A, zguess, S, C)
+        tof = get_tof_gauss_problem(x, y, A, S, meu)
+
+def get_tof_gauss_problem(x, y, A, S, meu):
+    num = (x**3 * S) + (A * np.sqrt(y))
+    denom = np.sqrt(meu)
+    tof = num / denom
+    return tof
+    
+def get_xy_gauss_problem(r1_0, r2_0, A, z, S, C):
+    num = 1 - (z * C)
+    denom = np.sqrt(C)
+    y = r1_0 + r2_0 - A * num / denom
+    x = np.sqrt(y/C)
+
+    return (y, x)
+
+def get_A(r1_mag, r2_mag, d_theta):
+    num = np.sqrt(r1_mag * r2_mag) * np.sin(d_theta)
+    denom = np.sqrt(1 - np.cos(d_theta))
+    A = num / denom
+    return A
+
 # Universal Variable Normal Functions
 def get_time_universal_var(r_mag, r_dot_v, meu, a, x):
     term1 = a*(x - np.sqrt(a)*np.sin(x/np.sqrt(a)))
