@@ -1,4 +1,4 @@
-from math import pi, sqrt, cos, factorial
+from math import pi, sqrt, cos, factorial, floor
 
 import poliastro
 from astropy import units as u
@@ -32,8 +32,16 @@ earth_rotation_velo_vector = np.array([0, 0, earth_rotational_velo.value]
                                         )*earth_rotational_velo.unit
 
 def elliptical_period(a, meu):
-    period = 2*pi*a**(1.5) / sqrt(meu)
+    period = 2*pi*a**(1.5) / np.sqrt(meu)
     return period
+
+def get_pass_periapsis(e, a, theta, tof, meu):
+    theta_final = 2*np.pi*u.rad
+    dt = time_of_flight_kepler(e, a, theta,theta_final, meu).to(u.s)
+    period = elliptical_period(a, meu).to(u.s)
+
+    k = floor((dt - tof.to(u.s)) / period)
+    return k
 
 #************************* Conservative Variables *****************************
 def specific_energy_from_velo(velo, meu, radius):
@@ -217,6 +225,7 @@ def get_SandC_elliptical(z):
     return (S, C)
 
 def get_SandC_hyperbolic(z):
+    z = np.longdouble(z)
     neg_root_z = np.sqrt(-z)
     S = (np.sinh(neg_root_z) - neg_root_z) / np.sqrt((-z)**3)
     C = (1 - np.cosh(neg_root_z)) / z
