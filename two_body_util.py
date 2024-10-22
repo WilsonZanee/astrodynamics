@@ -268,12 +268,17 @@ def get_z(x, a):
 
 # Gauss' Problem
 
-def get_velo_gauss_problem(r1, r2, meu, zguess=(2*np.pi)**2):
+def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
+                           max_iter=30):
     r1_0 = np.linalg.norm(r1)
     r2_0 = np.linalg.norm(r2)
     theta_short = np.arccos(np.dot(r1, r2) / (r1_0 * r2_0))
     theta_long = 2*np.pi - theta_short
-    thetas = [theta_short, theta_long]
+    thetas = {"short": theta_short, "long": theta_long}
+
+    z_guesses = np.linspace(1, 39, 6)
+    z_guesses = np.insert(z_guesses, 0, zguess)
+    print(z_guesses)
 
     if zguess > 0:
         SandC_func = get_SandC_elliptical
@@ -282,11 +287,34 @@ def get_velo_gauss_problem(r1, r2, meu, zguess=(2*np.pi)**2):
     if abs(zguess) < 1e-7:
         SandC_func = get_SandC_parabolic
 
-    for d_theta in thetas:
+    for trip_type, d_theta in thetas.items():
+        for guess in z_guesses:
+
+
+def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin, 
+                             max_iter):
+    
+    if zguess > 0:
+        SandC_func = get_SandC_elliptical
+    elif zguess < 0: 
+        SandC_func = get_SandC_hyperbolic
+    if abs(zguess) < 1e-7:
+        SandC_func = get_SandC_parabolic
+
+    counter = 0
+    while counter < max_iter:
         A = get_A(r1_0, r2_0, d_theta)
         S, C = SandC_func(zguess)
         y, x = get_xy_gauss_problem(r1_0, r2_0, A, zguess, S, C)
-        tof = get_tof_gauss_problem(x, y, A, S, meu)
+        t = get_tof_gauss_problem(x, y, A, S, meu)
+        t_diff = dt - t 
+        dtdz = get_dtdz_gauss(zguess, S, C, A, y, x, meu)
+        z = z + (t_diff / dtdz)
+
+        if abs(t_diff).value < margin:
+            break
+        counter = counter + 1
+    return 
 
 def get_tof_gauss_problem(x, y, A, S, meu):
     num = (x**3 * S) + (A * np.sqrt(y))
@@ -307,6 +335,23 @@ def get_A(r1_mag, r2_mag, d_theta):
     denom = np.sqrt(1 - np.cos(d_theta))
     A = num / denom
     return A
+
+def get_dtdz_gauss(z, S, C, A, y, x, meu):
+    dSdz = get_dSdz(z, S, C)
+    dCdz = get_dCdz(z, S, C)
+
+    term1 = x**3 * (dSdz - ((3 * S * dCdz) / (2 * C)))
+    term2 = (A / 8) * (((3 * S * np.sqrt(y)) / C) + (A / x))
+    dtdz = (term1 + term2) / np.sqrt(meu)
+    return dtdz
+
+def get_dSdz(z, S, C):
+    dSdz = (C - (3 * S)) / (2 * z)
+    return dSdz
+
+def get_dCdz(z, S, C):
+    dCdz = (1 - (z * S) - 2 * C) / (2 * z)
+    return dCdz
 
 # Universal Variable Normal Functions
 def get_time_universal_var(r_mag, r_dot_v, meu, a, x):
