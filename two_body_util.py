@@ -280,15 +280,13 @@ def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
     z_guesses = np.insert(z_guesses, 0, zguess)
     print(z_guesses)
 
-    if zguess > 0:
-        SandC_func = get_SandC_elliptical
-    elif zguess < 0: 
-        SandC_func = get_SandC_hyperbolic
-    if abs(zguess) < 1e-7:
-        SandC_func = get_SandC_parabolic
-
     for trip_type, d_theta in thetas.items():
         for guess in z_guesses:
+            try:
+                returned_val = iteratively_calc_z_gauss()
+                break
+            except FailedToConverge as e:
+                
 
 
 def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin, 
