@@ -111,7 +111,7 @@ def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
     return dt
 
 def predict_location(e, a, theta1, dt, pass_periapsis, 
-                     meu, guess_E=2):
+                     meu, guess_E=2, r_dot_v=-1):
     n = np.sqrt(meu/a**3)
     E_o = get_eccentric_anomaly(e, theta1).value
     M_init = n*dt - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
@@ -143,8 +143,10 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     df = pd.DataFrame(printout)
     print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
-    theta2 = 2*np.pi - theta2.value
-    return theta2*u.rad
+    if r_dot_v is not None:
+        if r_dot_v < 0:
+            theta2 = (2*np.pi - theta2.value)*u.rad
+    return theta2
 
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
                                  max_iter=30, hyperbolic_guess=2):

@@ -36,13 +36,17 @@ r2 = [2, -1.287, -0.3]*util.DU_EARTH
 v2 = [0.3, -0.63, 0.229]*util.DUTU_EARTH
 dt2 = (2.22*u.hr).to(util.TU_EARTH)
 meu_earth = 1*util.MEU_EARTH
+r_dot_v = np.dot(r2, v2)
 
 orbit = Orbit(r_vector=r2, v_vector=v2, meu=meu_earth)
 oe = orbit.orbital_elements
 k2 = util.get_pass_periapsis(oe.e, oe.a, oe.theta, dt2, meu_earth)
 
-theta_final = util.predict_location(oe.e, oe.a, oe.theta, dt2, k2, meu_earth)
+theta_final = util.predict_location(oe.e, oe.a, oe.theta, dt2, k2, meu_earth,
+                                     r_dot_v=r_dot_v)
 print(f"The final true anomaly is {theta_final} or {theta_final.to(u.deg)}")
+
+print(util.time_of_flight_kepler(oe.e, oe.a, oe.theta, theta_final, meu_earth, pass_periapsis=k2).to(u.hr))
 
 
 # Question 3: Kepler's Problem Solved w/ by S and C Method --------------------
