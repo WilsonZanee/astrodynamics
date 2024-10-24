@@ -5,6 +5,7 @@ from orbits import Orbit, OrbitalElements
 import two_body_util as util
 
 
+"""
 # TOF Kepler
 print("TOF Kepler")
 e = 0.85
@@ -65,3 +66,24 @@ meu = 1*util.MEU_EARTH
 
 r_final, v_final = util.time_of_flight_universal_var(r, v, dt, meu)
 print(r_final, v_final)
+"""
+# Gauss Problem
+# From Lecture
+r1 = [1, 0, 0]*util.DU_EARTH
+r2 = [2, 3, -1]*util.DU_EARTH
+dt = 20*util.TU_EARTH
+meu = 1*util.MEU_EARTH
+
+results = util.get_velo_gauss_problem(r1, r2, dt, meu, zguess=5 )
+print(results)
+
+# From Example Doc
+"""
+r1 = [0.566, 1.1, -0.4]*util.DU_EARTH
+r2 = [0.33, 2.11, 0]*util.DU_EARTH
+dt = 8.55*util.TU_EARTH
+meu = 1*util.MEU_EARTH
+
+results = util.get_velo_gauss_problem(r1, r2, dt, meu)
+print(results)
+"""

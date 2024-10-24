@@ -212,7 +212,12 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
 # S and C variation Function
 def get_SandC_elliptical(z):
     root_z = np.sqrt(z)
-    S = (root_z - np.sin(root_z)) / np.sqrt(z**3)
+    try:
+        val = root_z.unit
+        print(val)
+    except:
+        root_z = root_z*u.rad
+    S = (root_z.value - np.sin(root_z)) / np.sqrt(z**3)
     C = (1 - np.cos(root_z)) / z
     return (S, C)
 
@@ -259,7 +264,13 @@ def get_fg(meu, x, z, S, C, r0, r, t):
             "g": g,
             "f_dot": f_dot,
             "g_dot": g_dot}
-
+    return (f, g, f_dot, g_dot)
+    
+def get_fg_gauss(r1, r2, y, x, z, S, A, meu):
+    f = 1 - (y / r1)
+    g = A * np.sqrt(y / meu)
+    f_dot = ((- np.sqrt(meu) * x) / (r1 * r2)) * (1 - (z * S))
+    g_dot = 1 - (y / r2)
     return (f, g, f_dot, g_dot)
 
 def get_z(x, a):
@@ -270,27 +281,64 @@ def get_z(x, a):
 
 def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
                            max_iter=30):
+    results = {}
     r1_0 = np.linalg.norm(r1)
     r2_0 = np.linalg.norm(r2)
     theta_short = np.arccos(np.dot(r1, r2) / (r1_0 * r2_0))
-    theta_long = 2*np.pi - theta_short
+    theta_long = (2*np.pi)*u.rad - theta_short
     thetas = {"short": theta_short, "long": theta_long}
 
     z_guesses = np.linspace(1, 39, 6)
     z_guesses = np.insert(z_guesses, 0, zguess)
-    print(z_guesses)
 
     for trip_type, d_theta in thetas.items():
         for guess in z_guesses:
-            try:
-                returned_val = iteratively_calc_z_gauss()
+            z, printout, converged = iteratively_calc_z_gauss(r1_0, 
+                                                              r2_0,
+                                                              d_theta,
+                                                              guess,
+                                                              dt,
+                                                              meu,
+                                                              margin,
+                                                              max_iter)
+            if converged:
                 break
-            except FailedToConverge as e:
-                
+            else:
+                print(f"{trip_type} did not converge with z guess {guess}")
+                print(printout)
+        
+        print(f"{trip_type}:")
+        print(printout)
+        f, g, f_dot, g_dot = get_fg_gauss(r1_0, 
+                                          r2_0, 
+                                          printout["y"][-1],
+                                          printout["x"][-1], 
+                                          z, 
+                                          printout["S"][-1], 
+                                          printout["A"][-1],
+                                          meu)
 
+        v1 = (r2 - (f * r1)) / g
+        v2 = ((g_dot * r2) - r1) / g
 
+        results[trip_type] = {"v1": v1,
+                              "v2": v2}
+
+    return results
+            
 def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin, 
                              max_iter):
+
+    x_list = []
+    y_list = []
+    z_list = []
+    oldz_list = []
+    S_list = []
+    C_list = []
+    A_list = []
+    time_list = []
+    dt_list = []
+    dtdz_list = []
     
     if zguess > 0:
         SandC_func = get_SandC_elliptical
@@ -300,19 +348,56 @@ def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin,
         SandC_func = get_SandC_parabolic
 
     counter = 0
+    z = zguess
     while counter < max_iter:
         A = get_A(r1_0, r2_0, d_theta)
-        S, C = SandC_func(zguess)
-        y, x = get_xy_gauss_problem(r1_0, r2_0, A, zguess, S, C)
+        S, C = SandC_func(z)
+        y, x = get_xy_gauss_problem(r1_0, r2_0, A, z, S, C)
         t = get_tof_gauss_problem(x, y, A, S, meu)
         t_diff = dt - t 
-        dtdz = get_dtdz_gauss(zguess, S, C, A, y, x, meu)
+        dtdz = get_dtdz_gauss(z, S, C, A, y, x, meu)
+        try:
+            z_old = z.value
+        except:
+            z_old = z
         z = z + (t_diff / dtdz)
 
         if abs(t_diff).value < margin:
             break
         counter = counter + 1
-    return 
+        
+        x_list.append(x.value)
+        y_list.append(y.value)
+        z_list.append(z.value)
+        oldz_list.append(z_old)
+        S_list.append(S)
+        C_list.append(C)
+        A_list.append(A.value)
+        time_list.append(t.value)
+        dt_list.append(t_diff.value)
+        dtdz_list.append(dtdz.value)
+
+    if abs(t_diff.value) > margin:
+        converged = False
+    else:
+        converged = True
+
+    printout = {
+        "z_n": oldz_list,
+        "x": x_list,
+        "y": y_list,
+        "S": S_list,
+        "C": C_list,
+        "A": A_list,
+        "t": time_list,
+        "dt": dt_list,
+        "dtdz": dtdz_list,
+        "z_n+1": z_list
+    }
+    printout = pd.DataFrame(printout)
+
+    return (z, printout, converged) 
+
 
 def get_tof_gauss_problem(x, y, A, S, meu):
     num = (x**3 * S) + (A * np.sqrt(y))
@@ -321,7 +406,7 @@ def get_tof_gauss_problem(x, y, A, S, meu):
     return tof
     
 def get_xy_gauss_problem(r1_0, r2_0, A, z, S, C):
-    num = 1 - (z * C)
+    num = 1 - (z * S)
     denom = np.sqrt(C)
     y = r1_0 + r2_0 - A * num / denom
     x = np.sqrt(y/C)
