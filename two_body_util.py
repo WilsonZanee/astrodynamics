@@ -143,9 +143,14 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     df = pd.DataFrame(printout)
     print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
-    if r_dot_v is not None:
-        if r_dot_v < 0:
-            theta2 = (2*np.pi - theta2.value)*u.rad
+    if guess_E > np.pi and theta2.value < np.pi:
+        theta2 = (2*np.pi - theta2.value)*u.rad
+    elif guess_E < np.pi and theta2.value > np.pi:
+        theta2 = (2*np.pi - theta2.value)*u.rad
+
+#    if r_dot_v is not None:
+#        if r_dot_v < 0:
+#            theta2 = (2*np.pi - theta2.value)*u.rad
     return theta2
 
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
