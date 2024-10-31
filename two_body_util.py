@@ -1,4 +1,4 @@
-from math import pi, sqrt, cos, factorial
+from math import pi, sqrt, cos, factorial, isnan
 
 import poliastro
 from astropy import units as u
@@ -213,8 +213,8 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
 def get_SandC_elliptical(z):
     root_z = np.sqrt(z)
     try:
-        val = root_z.unit
-        print(val)
+        if root_z.unit == "":
+            root_z = root_z*u.rad
     except:
         root_z = root_z*u.rad
     S = (root_z.value - np.sin(root_z)) / np.sqrt(z**3)
@@ -267,10 +267,10 @@ def get_fg(meu, x, z, S, C, r0, r, t):
     return (f, g, f_dot, g_dot)
     
 def get_fg_gauss(r1, r2, y, x, z, S, A, meu):
-    f = 1 - (y / r1)
+    f = 1 - (y / r1).value
     g = A * np.sqrt(y / meu)
     f_dot = ((- np.sqrt(meu) * x) / (r1 * r2)) * (1 - (z * S))
-    g_dot = 1 - (y / r2)
+    g_dot = 1 - (y / r2).value
     return (f, g, f_dot, g_dot)
 
 def get_z(x, a):
@@ -280,7 +280,7 @@ def get_z(x, a):
 # Gauss' Problem
 
 def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
-                           max_iter=30):
+                           max_iter=30, print_convergence_table=False):
     results = {}
     r1_0 = np.linalg.norm(r1)
     r2_0 = np.linalg.norm(r2)
@@ -304,25 +304,26 @@ def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
             if converged:
                 break
             else:
-                print(f"{trip_type} did not converge with z guess {guess}")
-                print(printout)
-        
-        print(f"{trip_type}:")
-        print(printout)
+                if print_convergence_table:
+                    print(f"{trip_type} did not converge with z guess {guess}")
+                    print(printout)
+        if print_convergence_table:
+            print(f"{trip_type}:")
+            print(printout)
         f, g, f_dot, g_dot = get_fg_gauss(r1_0, 
                                           r2_0, 
-                                          printout["y"][-1],
-                                          printout["x"][-1], 
+                                          printout["y"].iloc[-1],
+                                          printout["x"].iloc[-1], 
                                           z, 
-                                          printout["S"][-1], 
-                                          printout["A"][-1],
+                                          printout["S"].iloc[-1], 
+                                          printout["A"].iloc[-1],
                                           meu)
 
-        v1 = (r2 - (f * r1)) / g
+        v1 = ((r2 - (f * r1)) / g)
         v2 = ((g_dot * r2) - r1) / g
 
-        results[trip_type] = {"v1": v1,
-                              "v2": v2}
+        results[trip_type] = {"v1": v1.value*DUTU_EARTH,
+                              "v2": v2.value*DUTU_EARTH}
 
     return results
             
@@ -377,7 +378,7 @@ def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin,
         dt_list.append(t_diff.value)
         dtdz_list.append(dtdz.value)
 
-    if abs(t_diff.value) > margin:
+    if abs(t_diff.value) > margin or isnan(z):
         converged = False
     else:
         converged = True
