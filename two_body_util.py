@@ -1,4 +1,5 @@
-from math import pi, sqrt, cos, factorial, isnan
+from math import pi, sqrt, cos, factorial, floor, isnan
+
 
 import poliastro
 from astropy import units as u
@@ -32,8 +33,16 @@ earth_rotation_velo_vector = np.array([0, 0, earth_rotational_velo.value]
                                         )*earth_rotational_velo.unit
 
 def elliptical_period(a, meu):
-    period = 2*pi*a**(1.5) / sqrt(meu)
+    period = 2*pi*a**(1.5) / np.sqrt(meu)
     return period
+
+def get_pass_periapsis(e, a, theta, tof, meu):
+    theta_final = 2*np.pi*u.rad
+    dt = time_of_flight_kepler(e, a, theta,theta_final, meu).to(u.s)
+    period = elliptical_period(a, meu).to(u.s)
+
+    k = floor((dt - tof.to(u.s)) / period)
+    return k
 
 #************************* Conservative Variables *****************************
 def specific_energy_from_velo(velo, meu, radius):
@@ -103,7 +112,7 @@ def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
     return dt
 
 def predict_location(e, a, theta1, dt, pass_periapsis, 
-                     meu, guess_E=2):
+                     meu, guess_E=2, r_dot_v=-1):
     n = np.sqrt(meu/a**3)
     E_o = get_eccentric_anomaly(e, theta1).value
     M_init = n*dt - 2*pass_periapsis*np.pi + (E_o - e*np.sin(E_o))
@@ -135,8 +144,15 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     df = pd.DataFrame(printout)
     print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
-    theta2 = 2*np.pi - theta2.value
-    return theta2*u.rad
+    if guess_E > np.pi and theta2.value < np.pi:
+        theta2 = (2*np.pi - theta2.value)*u.rad
+    elif guess_E < np.pi and theta2.value > np.pi:
+        theta2 = (2*np.pi - theta2.value)*u.rad
+
+#    if r_dot_v is not None:
+#        if r_dot_v < 0:
+#            theta2 = (2*np.pi - theta2.value)*u.rad
+    return theta2
 
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
                                  max_iter=30, hyperbolic_guess=2):
@@ -222,6 +238,7 @@ def get_SandC_elliptical(z):
     return (S, C)
 
 def get_SandC_hyperbolic(z):
+    z = np.longdouble(z)
     neg_root_z = np.sqrt(-z)
     S = (np.sinh(neg_root_z) - neg_root_z) / np.sqrt((-z)**3)
     C = (1 - np.cosh(neg_root_z)) / z

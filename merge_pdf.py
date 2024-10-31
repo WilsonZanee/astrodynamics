@@ -3,7 +3,6 @@ import os
 import sys
 from pathlib import Path
 
-from reportlab.pdfgen import canvas
 from pypdf import PdfMerger
 from fpdf import FPDF
 
