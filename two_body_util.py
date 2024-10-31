@@ -1,4 +1,5 @@
-from math import pi, sqrt, cos, factorial, floor
+from math import pi, sqrt, cos, factorial, floor, isnan
+
 
 import poliastro
 from astropy import units as u
@@ -227,7 +228,12 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
 # S and C variation Function
 def get_SandC_elliptical(z):
     root_z = np.sqrt(z)
-    S = (root_z - np.sin(root_z)) / np.sqrt(z**3)
+    try:
+        if root_z.unit == "":
+            root_z = root_z*u.rad
+    except:
+        root_z = root_z*u.rad
+    S = (root_z.value - np.sin(root_z)) / np.sqrt(z**3)
     C = (1 - np.cos(root_z)) / z
     return (S, C)
 
@@ -275,12 +281,178 @@ def get_fg(meu, x, z, S, C, r0, r, t):
             "g": g,
             "f_dot": f_dot,
             "g_dot": g_dot}
-
+    return (f, g, f_dot, g_dot)
+    
+def get_fg_gauss(r1, r2, y, x, z, S, A, meu):
+    f = 1 - (y / r1).value
+    g = A * np.sqrt(y / meu)
+    f_dot = ((- np.sqrt(meu) * x) / (r1 * r2)) * (1 - (z * S))
+    g_dot = 1 - (y / r2).value
     return (f, g, f_dot, g_dot)
 
 def get_z(x, a):
     z = x**2 / a
     return z
+
+# Gauss' Problem
+
+def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
+                           max_iter=30, print_convergence_table=False):
+    results = {}
+    r1_0 = np.linalg.norm(r1)
+    r2_0 = np.linalg.norm(r2)
+    theta_short = np.arccos(np.dot(r1, r2) / (r1_0 * r2_0))
+    theta_long = (2*np.pi)*u.rad - theta_short
+    thetas = {"short": theta_short, "long": theta_long}
+
+    z_guesses = np.linspace(1, 39, 6)
+    z_guesses = np.insert(z_guesses, 0, zguess)
+
+    for trip_type, d_theta in thetas.items():
+        for guess in z_guesses:
+            z, printout, converged = iteratively_calc_z_gauss(r1_0, 
+                                                              r2_0,
+                                                              d_theta,
+                                                              guess,
+                                                              dt,
+                                                              meu,
+                                                              margin,
+                                                              max_iter)
+            if converged:
+                break
+            else:
+                if print_convergence_table:
+                    print(f"{trip_type} did not converge with z guess {guess}")
+                    print(printout)
+        if print_convergence_table:
+            print(f"{trip_type}:")
+            print(printout)
+        f, g, f_dot, g_dot = get_fg_gauss(r1_0, 
+                                          r2_0, 
+                                          printout["y"].iloc[-1],
+                                          printout["x"].iloc[-1], 
+                                          z, 
+                                          printout["S"].iloc[-1], 
+                                          printout["A"].iloc[-1],
+                                          meu)
+
+        v1 = ((r2 - (f * r1)) / g)
+        v2 = ((g_dot * r2) - r1) / g
+
+        results[trip_type] = {"v1": v1.value*DUTU_EARTH,
+                              "v2": v2.value*DUTU_EARTH}
+
+    return results
+            
+def iteratively_calc_z_gauss(r1_0, r2_0, d_theta, zguess, dt, meu, margin, 
+                             max_iter):
+
+    x_list = []
+    y_list = []
+    z_list = []
+    oldz_list = []
+    S_list = []
+    C_list = []
+    A_list = []
+    time_list = []
+    dt_list = []
+    dtdz_list = []
+    
+    if zguess > 0:
+        SandC_func = get_SandC_elliptical
+    elif zguess < 0: 
+        SandC_func = get_SandC_hyperbolic
+    if abs(zguess) < 1e-7:
+        SandC_func = get_SandC_parabolic
+
+    counter = 0
+    z = zguess
+    while counter < max_iter:
+        A = get_A(r1_0, r2_0, d_theta)
+        S, C = SandC_func(z)
+        y, x = get_xy_gauss_problem(r1_0, r2_0, A, z, S, C)
+        t = get_tof_gauss_problem(x, y, A, S, meu)
+        t_diff = dt - t 
+        dtdz = get_dtdz_gauss(z, S, C, A, y, x, meu)
+        try:
+            z_old = z.value
+        except:
+            z_old = z
+        z = z + (t_diff / dtdz)
+
+        if abs(t_diff).value < margin:
+            break
+        counter = counter + 1
+        
+        x_list.append(x.value)
+        y_list.append(y.value)
+        z_list.append(z.value)
+        oldz_list.append(z_old)
+        S_list.append(S)
+        C_list.append(C)
+        A_list.append(A.value)
+        time_list.append(t.value)
+        dt_list.append(t_diff.value)
+        dtdz_list.append(dtdz.value)
+
+    if abs(t_diff.value) > margin or isnan(z):
+        converged = False
+    else:
+        converged = True
+
+    printout = {
+        "z_n": oldz_list,
+        "x": x_list,
+        "y": y_list,
+        "S": S_list,
+        "C": C_list,
+        "A": A_list,
+        "t": time_list,
+        "dt": dt_list,
+        "dtdz": dtdz_list,
+        "z_n+1": z_list
+    }
+    printout = pd.DataFrame(printout)
+
+    return (z, printout, converged) 
+
+
+def get_tof_gauss_problem(x, y, A, S, meu):
+    num = (x**3 * S) + (A * np.sqrt(y))
+    denom = np.sqrt(meu)
+    tof = num / denom
+    return tof
+    
+def get_xy_gauss_problem(r1_0, r2_0, A, z, S, C):
+    num = 1 - (z * S)
+    denom = np.sqrt(C)
+    y = r1_0 + r2_0 - A * num / denom
+    x = np.sqrt(y/C)
+
+    return (y, x)
+
+def get_A(r1_mag, r2_mag, d_theta):
+    num = np.sqrt(r1_mag * r2_mag) * np.sin(d_theta)
+    denom = np.sqrt(1 - np.cos(d_theta))
+    A = num / denom
+    return A
+
+def get_dtdz_gauss(z, S, C, A, y, x, meu):
+    dSdz = get_dSdz(z, S, C)
+    dCdz = get_dCdz(z, S, C)
+
+    term1 = x**3 * (dSdz - ((3 * S * dCdz) / (2 * C)))
+    term2 = (A / 8) * (((3 * S * np.sqrt(y)) / C) + (A / x))
+    dtdz = (term1 + term2) / np.sqrt(meu)
+    return dtdz
+
+def get_dSdz(z, S, C):
+    dSdz = (C - (3 * S)) / (2 * z)
+    return dSdz
+
+def get_dCdz(z, S, C):
+    dCdz = (1 - (z * S) - 2 * C) / (2 * z)
+    return dCdz
 
 # Universal Variable Normal Functions
 def get_time_universal_var(r_mag, r_dot_v, meu, a, x):

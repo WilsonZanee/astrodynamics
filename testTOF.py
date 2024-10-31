@@ -4,6 +4,18 @@ import astropy.units as u
 from orbits import Orbit, OrbitalElements
 import two_body_util as util
 
+def is_close(val_to_check, correct_val, margin=1e-3):
+    vals = [val_to_check, correct_val]
+    new_vals = []
+    for val in vals:
+        if isinstance(val, u.Quantity):
+            val = val.value
+        new_vals.append(val)
+    if abs(new_vals[0] - new_vals[1]) < margin:
+        close = True
+    else:
+        close = False
+    return close
 
 # TOF Kepler
 print("TOF Kepler")
@@ -65,3 +77,91 @@ meu = 1*util.MEU_EARTH
 
 r_final, v_final = util.time_of_flight_universal_var(r, v, dt, meu)
 print(r_final, v_final)
+
+# Gauss Problem
+# From Lecture
+r1 = [1, 0, 0]*util.DU_EARTH
+r2 = [2, 3, -1]*util.DU_EARTH
+dt = 20*util.TU_EARTH
+meu = 1*util.MEU_EARTH
+
+results = util.get_velo_gauss_problem(r1, r2, dt, meu, zguess=5 )
+print(results)
+
+correct_ans = {"short": {"v1": [1.126, 0.555, -0.185],
+                        "v2": [-0.318, -0.199, 0.0664]},
+               "long": {"v1": [-0.899, -0.847, 0.282],
+                        "v2": [0.0477, -0.352, 0.177]}}
+
+passing = True
+for sol_type, vectors in results.items():
+    for vector in vectors:
+        for i in range(len(vector)):
+            close = is_close(results[sol_type][vector][i], 
+                             correct_ans[sol_type][vector][i])
+            if not close:
+                print(f"{results[sol_type][vector][i]} =/=" 
+                      f"{correct_ans[sol_type][vector][i]}")
+                passing = False
+                break
+if not passing:
+    print(f"Test failed")
+
+# From Example Doc
+
+r1 = [.566, 1.1, -0.4]*util.DU_EARTH
+r2 = [0.33, 2.11, 0]*util.DU_EARTH
+dt = 8.55*util.TU_EARTH
+meu = 1*util.MEU_EARTH
+
+results = util.get_velo_gauss_problem(r1, r2, dt, meu, zguess=5 )
+print(results)
+
+correct_ans = {"short": {"v1": [0.263844, 0.886344, -0.12724],
+                        "v2": [-0.17499, -0.47812, 0.101745]},
+               "long": {"v1": [0.018046, -0.89061, -0.15975],
+                        "v2": [0.195142, -0.33997, -0.25212]}}
+
+passing = True
+for sol_type, vectors in results.items():
+    for vector in vectors:
+        for i in range(len(vector)):
+            close = is_close(results[sol_type][vector][i], 
+                             correct_ans[sol_type][vector][i])
+            if not close:
+                print(f"{results[sol_type][vector][i]} =/=" 
+                      f"{correct_ans[sol_type][vector][i]}")
+                passing = False
+                break
+if not passing:
+    print(f"Test failed")
+
+# From Example Doc
+
+r1 = [-1.1, 0, 0.55]*util.DU_EARTH
+r2 = [0, 0, -1]*util.DU_EARTH
+dt = 8.55*util.TU_EARTH
+meu = 1*util.MEU_EARTH
+
+results = util.get_velo_gauss_problem(r1, r2, dt, meu, zguess=5 )
+print(results)
+
+correct_ans = {"short": {"v1": [-0.9095, 0, -0.301],
+                        "v2": [0.831332, 0, 0.774892]},
+               "long": {"v1": [0.16025, 0, 0.943095],
+                        "v2": [-1.12554, 0, 0.148431]}}
+
+passing = True
+for sol_type, vectors in results.items():
+    for vector in vectors:
+        for i in range(len(vector)):
+            close = is_close(results[sol_type][vector][i], 
+                             correct_ans[sol_type][vector][i])
+            if not close:
+                print(f"{results[sol_type][vector][i]} =/=" 
+                      f"{correct_ans[sol_type][vector][i]}")
+                passing = False
+                break
+if not passing:
+    print(f"Test failed")
+
