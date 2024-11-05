@@ -92,7 +92,7 @@ except Exception as e:
 
 r3d = [-0.5, 0, 0]*util.DU_EARTH
 v3d = [0, 1.999, 0]*util.DUTU_EARTH
-dt3d = 10e3*util.TU_EARTH
+dt3d = 1e3*util.TU_EARTH
 
 print("3d:")
 r3d_f, v3d_f= util.time_of_flight_universal_var(r3d, v3d, dt3d, meu_earth)
