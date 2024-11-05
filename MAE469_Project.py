@@ -4,8 +4,15 @@
 # ==================================
 # ---- IMPORT LIBRARIES ----
 import math
+from datetime import datetime
+
 import numpy as np
+from astropy import units as u
+
 import MAE469_ProjectLibrary as PROJ
+import two_body_util as util
+from orbits import OrbitalElements as OE
+from planets import Planet
 
 # ---- PLANETARY ORBITAL ELEMENT INPUTS -----
 # Note: a (AU) , e (n/a) , i (deg) , raan (deg) , omega (deg) , theta (deg)
@@ -56,5 +63,24 @@ print(' Earth  |        ',np.around(r2E,4), '        |         ',np.around(v2E,4
 print('  Mars  |        ',np.around(r2M,4), '        |         ',np.around(v2M,4), '         |       ', np.around(TrueAnomalyM2,4))
 print('Jupiter |        ',np.around(r2J,4), '        |         ',np.around(v2J,4), '         |       ', np.around(TrueAnomalyJ2,4),'\n')
  
-# THis is as comment
-print("This is a comment")
+# Zane's Rewrite
+
+# ---- PLANETARY ORBITAL ELEMENT INPUTS -----
+# ---- GRAVITATIONAL CONSTANT W.R.T HELIOCENTRIC FRAME ----
+mu_sun = 1.0*util.MEU_EARTH # AU^3 / TU^2
+# -- EARTH --
+aE = 1.000000*util.AU_SUN 
+eE = 0.01671
+iE = 0.00005*u.deg
+raanE = -11.26064*u.deg 
+omegaE = 114.20783*u.deg 
+thetaE = -2.48284*u.deg
+oe_earth_epoch = OE(aE, eE, iE, raanE, omegaE, thetaE)
+earth_epoch = datetime.fromisoformat('2000-01-01 11:58:00.000')
+EARTH = Planet(oe_earth_epoch, earth_epoch, mu_sun)
+EARTH.get_eo_at_time(datetime.fromisoformat('2025-12-25 08:37:00.000'))
+
+# -- MARS --
+aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+# -- JUPITER -- 
+aJ = 5.203363; eJ = 0.048393; iJ = 1.3053; raanJ = 100.55615; omegaJ = -85.8023; thetaJ = 19.55053
