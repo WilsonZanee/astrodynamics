@@ -1,7 +1,6 @@
 from math import pi, sqrt, cos, factorial, floor, isnan
 
 
-import poliastro
 from astropy import units as u
 from astropy.units.quantity import Quantity
 import numpy as np
