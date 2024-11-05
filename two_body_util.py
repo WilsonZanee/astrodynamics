@@ -1,7 +1,6 @@
 from math import pi, sqrt, cos, factorial, floor, isnan
 
 
-import poliastro
 from astropy import units as u
 from astropy.units.quantity import Quantity
 import numpy as np
@@ -261,7 +260,7 @@ def get_time_from_SandC(x, z, S, C, r0, r_dot_v, meu):
     term3 = r0 * x * (1 - (z*S))
     time = (term1 + term2 + term3) / np.sqrt(meu)
 
-    return time.to(TU_EARTH)
+    return time.to(u.day)
 
 def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
     term1 = x**2 * C
@@ -273,8 +272,8 @@ def get_r_from_SandC(x, z, S, C, r0, r_dot_v, meu):
 
 def get_fg(meu, x, z, S, C, r0, r, t):
     f = 1 - (x**2 / r0) * C
-    g = (t - (x**3 / np.sqrt(meu)) * S).to(TU_EARTH)
-    f_dot = (((np.sqrt(meu) * x) / (r0 * r)) * ((z * S) - 1)).to(1/TU_EARTH)
+    g = (t - (x**3 / np.sqrt(meu)) * S).to(u.day)
+    f_dot = (((np.sqrt(meu) * x) / (r0 * r)) * ((z * S) - 1)).to(1/u.day)
     g_dot = 1 - (x**2 / r) * C
 
     vars = {"f": f,
@@ -339,8 +338,8 @@ def get_velo_gauss_problem(r1, r2, dt, meu, zguess=10, margin=1e-7,
         v1 = ((r2 - (f * r1)) / g)
         v2 = ((g_dot * r2) - r1) / g
 
-        results[trip_type] = {"v1": v1.value*DUTU_EARTH,
-                              "v2": v2.value*DUTU_EARTH}
+        results[trip_type] = {"v1": v1.value*(r1.unit/dt.unit),
+                              "v2": v2.value*(r1.unit/dt.unit)}
 
     return results
             
