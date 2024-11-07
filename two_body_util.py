@@ -18,7 +18,8 @@ du_tu = (MEU_EARTH**(1/2)/DU_EARTH**(1/2), DUTU_EARTH,
           lambda x: 1*x, lambda x: 1*x)
 
 AU_SUN = u.def_unit("Au Sun", 1.496e8*u.km) 
-TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d) 
+#TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d) 
+TU_SUN = u.def_unit("Tu Sun", 58.13*u.d) 
 AUTU_SUN = u.def_unit("Au/Tu Sun", 29.784852*u.km/u.s) 
 MEU_SUN = u.def_unit("meu Sun", 1.3271544e11*u.km**3/u.s**2)
 
@@ -141,7 +142,7 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     "En+1": eNew_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
+    #print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
     if guess_E > np.pi and theta2.value < np.pi:
         theta2 = (2*np.pi - theta2.value)*u.rad
@@ -156,15 +157,15 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
                                  max_iter=30, hyperbolic_guess=2):
     margin = 1e-7
-    r0 = np.linalg.norm(r_init).to(DU_EARTH)
-    v0 = np.linalg.norm(v_init).to(DUTU_EARTH)
-    spec_energy = specific_energy_from_velo(v0, meu, r0).to(SPEC_E_EARTH)
-    a = semi_major_axis_from_energy(spec_energy, meu).to(DU_EARTH)
-    r_dot_v = np.dot(r_init, v_init).to(MOMENTUM_EARTH)
+    r0 = np.linalg.norm(r_init).to(r_init.unit)
+    v0 = np.linalg.norm(v_init).to(v_init.unit)
+    spec_energy = specific_energy_from_velo(v0, meu, r0).to(u.km**2/u.s**2)
+    a = semi_major_axis_from_energy(spec_energy, meu).to(r_init.unit)
+    r_dot_v = np.dot(r_init, v_init).to(r_init.unit * v_init.unit)
     if a > 0:
-        x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
+        x_guess = ((np.sqrt(meu)*dt)/a).to(r_init.unit**(1/2))
     if a < 0:
-        x_guess = hyperbolic_guess*DU_EARTH**(1/2)
+        x_guess = hyperbolic_guess*r_init.unit**(1/2)
 
     x_list = []
     z_list = []
@@ -216,8 +217,8 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
+    print(f, g, f_dot, g_dot)
 
     r_final = f * r_init + g * v_init
     v_final = f_dot * r_init + g_dot * v_init

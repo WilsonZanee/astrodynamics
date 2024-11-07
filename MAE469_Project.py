@@ -12,7 +12,7 @@ from astropy import units as u
 import MAE469_ProjectLibrary as PROJ
 import two_body_util as util
 from orbits import OrbitalElements as OE
-from planets import Planet
+from planets import Planet_Proj
 
 # ---- PLANETARY ORBITAL ELEMENT INPUTS -----
 # Note: a (AU) , e (n/a) , i (deg) , raan (deg) , omega (deg) , theta (deg)
@@ -67,18 +67,17 @@ print('Jupiter |        ',np.around(r2J,4), '        |         ',np.around(v2J,4
 
 # ---- PLANETARY ORBITAL ELEMENT INPUTS -----
 # ---- GRAVITATIONAL CONSTANT W.R.T HELIOCENTRIC FRAME ----
-mu_sun = 1.0*util.MEU_EARTH # AU^3 / TU^2
+mu_sun = 1.0 # AU^3 / TU^2
 # -- EARTH --
-aE = 1.000000*util.AU_SUN 
+aE = 1.000000 
 eE = 0.01671
-iE = 0.00005*u.deg
-raanE = -11.26064*u.deg 
-omegaE = 114.20783*u.deg 
-thetaE = -2.48284*u.deg
-oe_earth_epoch = OE(aE, eE, iE, raanE, omegaE, thetaE)
+iE = 0.00005
+raanE = -11.26064
+omegaE = 114.20783 
+thetaE = -2.48284
 earth_epoch = datetime.fromisoformat('2000-01-01 11:58:00.000')
-EARTH = Planet(oe_earth_epoch, earth_epoch, mu_sun)
-print(EARTH.get_rv_theta(datetime.fromisoformat('2025-12-25 08:37:00.000')))
+EARTH = Planet_Proj(aE, eE, iE, raanE, omegaE, thetaE, earth_epoch, mu_sun)
+print(EARTH.get_orbit_at_time(datetime.fromisoformat('2024-11-01 03:21:00.000')))
 
 # -- MARS --
 aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
