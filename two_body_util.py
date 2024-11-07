@@ -64,11 +64,11 @@ def angular_momentum_from_periapsis(vp, rp):
 
 def velo_from_energy(energy, meu, radius):
     velo = np.sqrt(2*(energy + meu/radius))
-    return velo.to(DUTU_EARTH)
+    return velo.to(u.km/u.s)
 
 def velo_from_radius(meu, radius, semi_major_axis):
     velo = np.sqrt((2*meu/radius) - (meu/semi_major_axis))
-    return velo.to(DUTU_EARTH)
+    return velo.to(u.km/u.s)
 
 def get_escape_velo(meu, radius):
     velo = np.sqrt(2*meu/radius)
@@ -99,6 +99,11 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     r = p/(1+e*np.cos(theta))
+    return r
+
+#*********************** Interplanetary Trajectories **************************
+def get_sphere_of_influence(large_mass, small_mass, distance):
+    r = distance * (small_mass / large_mass) ** (2/5)
     return r
 
 #************************ Time of Flight *************************

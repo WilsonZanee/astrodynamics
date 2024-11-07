@@ -190,6 +190,10 @@ class Orbit:
     def get_rp(a, e):
         ra = a*(1-e)
         return ra
+    
+    def get_ra(rp, e):
+        ra = ((rp.value * (1 + e)) / (1 - e))*rp.unit
+        return ra
 
     # Finding Orbital Elements
 
