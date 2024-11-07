@@ -22,15 +22,22 @@ class Planet:
         self.meu = meu
 
     def get_orbit_at_time(self, time):
-        r_epoch = (self.orbit_at_epoch.r_vector).value
-        v_epoch = (self.orbit_at_epoch.v_vector).value
+        r_epoch = (self.orbit_at_epoch.r_vector).flatten()
+        v_epoch = (self.orbit_at_epoch.v_vector).flatten().to(util.AUTU_SUN)
+        print(r_epoch, v_epoch)
         dt = (abs((time - self.epoch).total_seconds())*u.s).to(util.TU_SUN)
-        print(dt)
-        [r2E,v2E] = PROJ.universalTOF_SCZ(r_epoch, 
-                                          v_epoch, 
-                                          dt.value, 
-                                          self.meu.value)
-        orbit = Orbit(r_vector=r2E*util.AU_SUN, 
-                      v_vector=v2E*util.AUTU_SUN, 
-                      meu=self.meu)
+        r2, v2 = util.time_of_flight_universal_var(r_epoch, 
+                                                   v_epoch, 
+                                                   dt, 
+                                                   self.meu)
+        print (r2, v2)
+        orbit = Orbit(r_vector=r2, v_vector=v2.to(util.AUTU_SUN), meu=self.meu)
         return orbit
+    
+    def get_rv_theta(self, time):
+        orbit = self.get_orbit_at_time(time)
+        r = orbit.r_vector
+        v = orbit.v_vector
+        theta = orbit.orbital_elements.theta
+
+        return (r, v, theta.to(u.deg))

@@ -78,7 +78,7 @@ thetaE = -2.48284*u.deg
 oe_earth_epoch = OE(aE, eE, iE, raanE, omegaE, thetaE)
 earth_epoch = datetime.fromisoformat('2000-01-01 11:58:00.000')
 EARTH = Planet(oe_earth_epoch, earth_epoch, mu_sun)
-EARTH.get_eo_at_time(datetime.fromisoformat('2025-12-25 08:37:00.000'))
+print(EARTH.get_rv_theta(datetime.fromisoformat('2025-12-25 08:37:00.000')))
 
 # -- MARS --
 aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
