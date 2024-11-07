@@ -208,7 +208,7 @@ class Orbit:
         theta = Orbit.get_theta(r, e_vector, v)
         a = Orbit.get_a(angular_momentum, e, meu)
 
-        oe = OrbitalElements(a, e, i, raan, arg_periapsis, theta)
+        oe = OrbitalElements(a.to(r.unit), e.value, i, raan, arg_periapsis, theta)
         return oe
     
     def get_a(angular_momentum, e, meu):
@@ -269,4 +269,31 @@ class Orbit:
     def get_v_vector_perifocal(meu, p, theta, e):
         v = np.sqrt(meu/p)*np.matrix([-np.sin(theta), (e+np.cos(theta)), 0])
         return v
+    
+def interplanetary_transfer_dv(r_parked_orbit, 
+                               r_planet, 
+                               mu_sun, 
+                               transfer_angular_momentum,
+                               v_transfer,
+                               mu_planet):
+    
+    v_planet = util.velo_from_radius(mu_sun, r_planet, r_planet)
+    #print(f"planet velocity: {v_planet.to(u.km/u.s)}")
+    flightpath_angle = util.get_flightpath_angle(transfer_angular_momentum, 
+                                                r_planet, 
+                                                v_planet)
+    v_inf2 = util.get_plane_change_dv(v_transfer, v_planet, flightpath_angle.to(u.rad))
+    #print(f"V-inf: {v_inf2.to(u.km/u.s)}")
+    energy_infinity = util.specific_energy_from_velo_infinity(v_inf2)
+    v_excess = util.velo_from_energy(energy_infinity, 
+                                                mu_planet, 
+                                                r_parked_orbit)
+    #print(f"V excess: {v_excess.to(u.km/u.s)}")
+    v_planet_parked = util.velo_from_radius(mu_planet, 
+                                            r_parked_orbit, 
+                                            r_parked_orbit)
+    #print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
 
+
+    dv = v_excess - v_planet_parked
+    return dv

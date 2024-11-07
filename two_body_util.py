@@ -48,6 +48,10 @@ def specific_energy_from_velo(velo, meu, radius):
     energy = ((velo**2)/2) - (meu/radius)
     return energy
 
+def specific_energy_from_velo_infinity(velo):
+    energy = ((velo**2)/2)
+    return energy
+
 def specific_energy_from_rpra(rp, ra, meu):
     energy = -meu / (ra + rp)
     return energy.to(SPEC_E_EARTH)
@@ -96,6 +100,10 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
     e = sqrt(1 + (2*angular_momentum**2*energy/meu**2))
     return e
 
+def eccentricity_from_rarp(ra, rp):
+    e = (ra - rp) / (ra + rp)
+    return e
+
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     r = p/(1+e*np.cos(theta))
@@ -105,6 +113,18 @@ def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
 def get_sphere_of_influence(large_mass, small_mass, distance):
     r = distance * (small_mass / large_mass) ** (2/5)
     return r
+
+def get_flightpath_angle(angular_momentum, r, v):
+    cos_val = angular_momentum / (r * v)
+    if cos_val > 1 or cos_val < -1:
+        angle = 0*u.rad
+    else:
+        angle = np.arccos(angular_momentum / (r * v))
+    return angle
+
+def get_offset_range(offset_dist, r_target, r_surface):
+    offset_range = offset_dist* (r_target - r_surface)
+    return offset_range
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
@@ -146,7 +166,7 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     "En+1": eNew_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
+    #print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
     if guess_E > np.pi and theta2.value < np.pi:
         theta2 = (2*np.pi - theta2.value)*u.rad
@@ -221,7 +241,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
+    #print(df) 
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = f * r_init + g * v_init
