@@ -20,7 +20,7 @@ du_tu = (MEU_EARTH**(1/2)/DU_EARTH**(1/2), DUTU_EARTH,
 AU_SUN = u.def_unit("Au Sun", 1.496e8*u.km) 
 TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d) 
 AUTU_SUN = u.def_unit("Au/Tu Sun", 29.784852*u.km/u.s) 
-MEU_SUN = u.def_unit("meu Sun", 1.3271544e11*u.km**3/u.s**2)
+MEU_SUN = u.def_unit("mu Sun", 1.3271544e11*u.km**3/u.s**2)
 
 spec_energy = u.km**2/u.s**2
 angular_momentum = u.km**2/u.s
@@ -54,7 +54,7 @@ def specific_energy_from_velo_infinity(velo):
 
 def specific_energy_from_rpra(rp, ra, meu):
     energy = -meu / (ra + rp)
-    return energy.to(SPEC_E_EARTH)
+    return energy.to(u.km**2/u.s**2)
 
 def angular_momentum_from_p(p, meu):
     momentum = np.sqrt(p*meu) 
@@ -80,10 +80,6 @@ def get_escape_velo(meu, radius):
 
 def get_plane_change_dv(v1, v2, di):
     di = ensure_rad(di)
-#    v1sqr = v1**2
-#    v2sqr = v2**2
-#    negterm = -2*v1*v2*cos(di.value)
-#    dv = np.sqrt(v1sqr + v2sqr + negterm)
     dv = np.sqrt(v1**2 + v2**2 - 2*v1*v2*cos(di.value))
     return dv
 
@@ -114,17 +110,70 @@ def get_sphere_of_influence(large_mass, small_mass, distance):
     r = distance * (small_mass / large_mass) ** (2/5)
     return r
 
-def get_flightpath_angle(angular_momentum, r, v):
-    cos_val = angular_momentum / (r * v)
+def get_flightpath_angle(angular_momentum, r, v, print_ang=False):
+    cos_val = (angular_momentum.to(u.km**2/u.s) / (r.to(u.km) * v.to(u.km/u.s)))
     if cos_val > 1 or cos_val < -1:
         angle = 0*u.rad
     else:
-        angle = np.arccos(angular_momentum / (r * v))
+        angle = np.arccos((angular_momentum.to(u.km**2/u.s) / (r * v)))
+    if print_ang:
+        print(f"h: {angular_momentum}")
+        print(f"r,v: {r} {v}")
+        print(f"cos_val: {cos_val}")
+        print(f"Flightpath angle raw: {angle.to(u.deg)}")
+    if angle > (np.pi / 2)*u.rad:
+        angle = angle - (np.pi / 2)*u.rad
+    elif angle < (-np.pi / 2)*u.rad:
+        angle = angle + (np.pi / 2)*u.rad
+    if print_ang:
+        print(f"Flightpath angle final: {angle.to(u.deg)}")
     return angle
 
-def get_offset_range(offset_dist, r_target, r_surface):
-    offset_range = offset_dist* (r_target - r_surface)
-    return offset_range
+def get_v_inf(mu, r_planet, a_planet, transfer_angular_momentum, v_transfer,
+              prints=False):
+    v_planet = velo_from_radius(mu, r_planet, a_planet)
+    flightpath_angle = get_flightpath_angle(transfer_angular_momentum, 
+                                            r_planet, 
+                                            v_transfer,
+                                            print_ang=prints)
+    v_inf = (v_transfer * np.cos(flightpath_angle)) - v_planet
+    if prints:
+        print(f"v_planet: {v_planet}")
+        print(f"v_inf: {v_inf}")
+    return v_inf
+
+def get_best_turn_angle(rp, v_inf, mu, debug=False):
+    if debug:
+        print(rp)
+        print(v_inf.to(u.km/u.s))
+        print(mu)
+    e = (1 + ((rp * v_inf**2) / mu))
+    delta = 2*np.arcsin(1 / e)
+    if debug:
+        print(f"Max Delta: {delta.to(u.deg)}")
+        print(f"e: {e}")
+    return delta, e
+
+def get_gravity_assist_velo(rp, v_transfer, v_planet, mu, debug=False):
+    v_inf = v_transfer - v_planet
+    v_inf_magnitude = np.linalg.norm(v_inf)
+    d, e = get_best_turn_angle(rp, v_inf_magnitude, mu, debug=debug)
+    R = np.array([[np.cos(d), -np.sin(d), 0],
+                  [np.sin(d), np.cos(d), 0],
+                  [0, 0, 1]])
+    v_inf2 = np.dot(R, v_inf)
+    v2_mag = np.linalg.norm(v_inf2)
+    if debug:
+        print(f"v2_mag: {v2_mag}")
+        print(f"v2: {v_inf2}")
+    v_final = v_inf2 + v_planet
+    v_final_mag = np.linalg.norm(v_final)
+    return v_final, v_final_mag
+
+def get_offset_dist(r_target, v_inf, mu_body):
+    offset_dist = (r_target / v_inf) * \
+                    np.sqrt(v_inf ** 2 + (2 * mu_body / r_target))
+    return offset_dist
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):

@@ -275,24 +275,26 @@ def interplanetary_transfer_dv(r_parked_orbit,
                                mu_sun, 
                                transfer_angular_momentum,
                                v_transfer,
-                               mu_planet):
+                               mu_planet,
+                               print_v=False):
     
-    v_planet = util.velo_from_radius(mu_sun, r_planet, r_planet)
-    #print(f"planet velocity: {v_planet.to(u.km/u.s)}")
-    flightpath_angle = util.get_flightpath_angle(transfer_angular_momentum, 
-                                                r_planet, 
-                                                v_planet)
-    v_inf2 = util.get_plane_change_dv(v_transfer, v_planet, flightpath_angle.to(u.rad))
-    #print(f"V-inf: {v_inf2.to(u.km/u.s)}")
-    energy_infinity = util.specific_energy_from_velo_infinity(v_inf2)
+    v_inf = util.get_v_inf(mu_sun, 
+                           r_planet, 
+                           r_planet, 
+                           transfer_angular_momentum,
+                           v_transfer,
+                           prints=print_v)
+    energy_infinity = util.specific_energy_from_velo_infinity(v_inf)
     v_excess = util.velo_from_energy(energy_infinity, 
                                                 mu_planet, 
                                                 r_parked_orbit)
-    #print(f"V excess: {v_excess.to(u.km/u.s)}")
     v_planet_parked = util.velo_from_radius(mu_planet, 
                                             r_parked_orbit, 
                                             r_parked_orbit)
-    #print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
+    if print_v:
+        print(f"V-inf: {v_inf.to(u.km/u.s)}")
+        print(f"V excess: {v_excess.to(u.km/u.s)}")
+        print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
 
 
     dv = v_excess - v_planet_parked
