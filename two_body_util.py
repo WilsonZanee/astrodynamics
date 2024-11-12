@@ -136,11 +136,14 @@ def get_v_inf(mu, r_planet, a_planet, transfer_angular_momentum, v_transfer,
                                             r_planet, 
                                             v_transfer,
                                             print_ang=prints)
+    v_inf_test = get_plane_change_dv(v_transfer, v_planet, flightpath_angle)
     v_inf = (v_transfer * np.cos(flightpath_angle)) - v_planet
     if prints:
         print(f"v_planet: {v_planet}")
+        print(f"Vt in planet direction: {(v_transfer*np.cos(flightpath_angle)).to(u.km/u.s)}")
+        print(f"v_inf_test: {v_inf_test.to(u.km/u.s)}")
         print(f"v_inf: {v_inf}")
-    return v_inf
+    return v_inf_test
 
 def get_best_turn_angle(rp, v_inf, mu, debug=False):
     if debug:
@@ -174,6 +177,12 @@ def get_offset_dist(r_target, v_inf, mu_body):
     offset_dist = (r_target / v_inf) * \
                     np.sqrt(v_inf ** 2 + (2 * mu_body / r_target))
     return offset_dist
+
+def angular_momentum_enter_SOI(r_target, v_inf, mu_body, delta=None):
+    if delta is None:    
+        delta = get_offset_dist(r_target, v_inf, mu_body)
+    h = v_inf*delta
+    return h
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):

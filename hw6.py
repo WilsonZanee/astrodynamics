@@ -43,7 +43,8 @@ dv1 = interplanetary_transfer_dv(earth_orbit_r,
                                  mu_sun,
                                  transfer_angular_momentum,
                                  vt1,
-                                 mu_earth)
+                                 mu_earth, 
+                                 print_v=False)
 #print(dv1)
 # Incoming to Jupiter
 dv2 = interplanetary_transfer_dv(jupiter_orbit_r,
@@ -51,10 +52,12 @@ dv2 = interplanetary_transfer_dv(jupiter_orbit_r,
                                  mu_sun,
                                  transfer_angular_momentum,
                                  vt2,
-                                 mu_jupiter)
+                                 mu_jupiter,
+                                 print_v=True)
 #print(dv2)
 # Total dv
 dv = abs(dv1) + abs(dv2)
+print(dv1, dv2)
 print(f"The total dv is {dv}")
 
 
@@ -113,7 +116,7 @@ print(transfer_orbit.orbital_elements)
 print("\nPart 3c - dV for Earth departure:")
 r_at_earth_scalar = np.linalg.norm(r_at_earth)
 v1_transfer = np.linalg.norm(v_at_earth)
-transfer_h = np.dot(r_at_earth, v_at_earth)
+transfer_h = np.linalg.norm(np.cross(r_at_earth, v_at_earth))
 
 dv_earth_departure = interplanetary_transfer_dv(r_parked_earth,
                                                 r_at_earth_scalar,
@@ -121,24 +124,16 @@ dv_earth_departure = interplanetary_transfer_dv(r_parked_earth,
                                                 transfer_h,
                                                 v1_transfer,
                                                 mu_earth,
-                                                print_v=False)
+                                                print_v=True)
 print(f"dV for Earth Departure: {dv_earth_departure}")
 
 # 3d - determine Mars atmosphereic entry v and offset range
 print(f"\nPart 3d - Mars lander and orbiter")
 v2_transfer = np.linalg.norm(v_at_mars)
 v_inf_mars = util.get_v_inf(mu_sun, r_mars, r_mars, transfer_h, v2_transfer)
-dv_atmospheric_orbit = interplanetary_transfer_dv(r_final_lander,
-                                                  r_mars,
-                                                  mu_sun,
-                                                  transfer_h,
-                                                  v2_transfer,
-                                                  mu_mars,
-                                                  print_v=False)
-v_atmospheric_entry = dv_atmospheric_orbit + util.velo_from_radius(mu_mars,
-                                                                   r_final_lander,
-                                                                   r_final_lander)
-
+h_lander = util.angular_momentum_enter_SOI(r_final_lander, v_inf_mars, mu_mars)
+v_atmospheric_entry = (h_lander/\
+                        (r_final_lander * np.cos(flightpath_angle_lander))).to(u.km/u.s)
 
 r_mars_surf = 3380*u.km
 offset_dist_surf = util.get_offset_dist(r_mars_surf, v_inf_mars, mu_mars)
@@ -156,5 +151,5 @@ dv_orbiter = interplanetary_transfer_dv(r_final_orbiter,
                                         transfer_h,
                                         v2_transfer,
                                         mu_mars,
-                                        print_v=False)
+                                        print_v=True)
 print(f"dV: {dv_orbiter}")
