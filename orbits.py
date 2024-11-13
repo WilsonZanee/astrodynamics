@@ -292,7 +292,6 @@ def interplanetary_transfer_dv(r_parked_orbit,
                                             r_parked_orbit, 
                                             r_parked_orbit)
     if print_v:
-        print(f"V-inf: {v_inf.to(u.km/u.s)}")
         print(f"V excess: {v_excess.to(u.km/u.s)}")
         print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
 

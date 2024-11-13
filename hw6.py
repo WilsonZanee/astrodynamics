@@ -153,3 +153,18 @@ dv_orbiter = interplanetary_transfer_dv(r_final_orbiter,
                                         mu_mars,
                                         print_v=True)
 print(f"dV: {dv_orbiter}")
+
+
+# Question 4: Orion S/C Lunar Orbit Insertion ---------------------------------
+print("\n" + "-"*width + "\n")
+print("Question 4: Orion S/C Lunar Orbit Insertion\n")
+
+r_lunar = 252*u.km + util.LUNAR_RADIUS
+v_inf = 0.5*u.km/u.s
+
+print("4a - Epsilon_2:")
+soi_lunar = util.get_SOI(
+                  util.D_EARTH_LUNAR, util.LUNAR_MASS, util.MU_EARTH).to(u.km)
+
+energy2 = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
+print(energy2)

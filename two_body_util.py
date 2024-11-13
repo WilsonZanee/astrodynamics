@@ -22,6 +22,11 @@ TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d)
 AUTU_SUN = u.def_unit("Au/Tu Sun", 29.784852*u.km/u.s) 
 MEU_SUN = u.def_unit("mu Sun", 1.3271544e11*u.km**3/u.s**2)
 
+LUNAR_RADIUS = 1737.4*u.km
+LUNAR_MASS = 7.349e22*u.kg
+MU_LUNAR = 4903*u.km**3/u.s**2
+D_EARTH_LUNAR = 384400*u.km
+
 spec_energy = u.km**2/u.s**2
 angular_momentum = u.km**2/u.s
 
@@ -136,14 +141,12 @@ def get_v_inf(mu, r_planet, a_planet, transfer_angular_momentum, v_transfer,
                                             r_planet, 
                                             v_transfer,
                                             print_ang=prints)
-    v_inf_test = get_plane_change_dv(v_transfer, v_planet, flightpath_angle)
-    v_inf = (v_transfer * np.cos(flightpath_angle)) - v_planet
+    v_inf = get_plane_change_dv(v_transfer, v_planet, flightpath_angle)
     if prints:
         print(f"v_planet: {v_planet}")
-        print(f"Vt in planet direction: {(v_transfer*np.cos(flightpath_angle)).to(u.km/u.s)}")
-        print(f"v_inf_test: {v_inf_test.to(u.km/u.s)}")
-        print(f"v_inf: {v_inf}")
-    return v_inf_test
+        print(f"v transfer: {v_transfer.to(u.km/u.s)}")
+        print(f"v_inf: {v_inf.to(u.km/u.s)}")
+    return v_inf
 
 def get_best_turn_angle(rp, v_inf, mu, debug=False):
     if debug:
@@ -183,6 +186,13 @@ def angular_momentum_enter_SOI(r_target, v_inf, mu_body, delta=None):
         delta = get_offset_dist(r_target, v_inf, mu_body)
     h = v_inf*delta
     return h
+
+def get_SOI(dist, small_mass, big_mass):
+    soi = dist * (small_mass / big_mass) ** (2/5)
+    return soi
+
+#**************************** Lunar Trajectories ******************************
+
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
