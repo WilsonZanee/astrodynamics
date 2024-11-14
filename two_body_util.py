@@ -192,7 +192,7 @@ def get_SOI(dist, small_mass, big_mass):
     return soi
 
 #**************************** Lunar Trajectories ******************************
-
+#def get_epsilon2(v_lunar, v_inf, lambda1, phi1, gamma1):
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):

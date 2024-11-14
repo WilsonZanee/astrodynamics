@@ -159,7 +159,7 @@ print(f"dV: {dv_orbiter}")
 print("\n" + "-"*width + "\n")
 print("Question 4: Orion S/C Lunar Orbit Insertion\n")
 
-r_lunar = 252*u.km + util.LUNAR_RADIUS
+r_lunar_orbit = 252*u.km + util.LUNAR_RADIUS
 v_inf = 0.5*u.km/u.s
 
 print("4a - Epsilon_2:")
@@ -167,4 +167,17 @@ soi_lunar = util.get_SOI(
                   util.D_EARTH_LUNAR, util.LUNAR_MASS, util.MU_EARTH).to(u.km)
 
 energy2 = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
-print(energy2)
+energy2_inf = util.specific_energy_from_velo_infinity(v_inf)
+print(f"Energy to satisfy conditions: {energy2_inf.round(4)}")
+
+print("4b - Orbit Insertion dv and burn direction")
+v_excess = util.velo_from_energy(energy2_inf, 
+                              util.MU_LUNAR, 
+                              r_lunar_orbit)
+v_planet_parked = util.velo_from_radius(util.MU_LUNAR, 
+                                          r_lunar_orbit, 
+                                          r_lunar_orbit)
+dv = v_excess - v_planet_parked
+print(v_excess, v_planet_parked)
+print(f"dv: {dv}\nThe burn will be against the direction of motion.")
+
