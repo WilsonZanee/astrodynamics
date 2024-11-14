@@ -145,12 +145,14 @@ print(f"Offset range for Mars Lander: {offset_range}")
 
 # 3e - determine dv required for mars orbiter insertion
 print("\n3e - dV required for mars orbiter insertion")
+a_mars = 1.524*util.AU_SUN
 dv_orbiter = interplanetary_transfer_dv(r_final_orbiter,
-                                        r_mars,
+                                        np.linalg.norm(r_at_mars),
                                         mu_sun,
                                         transfer_h,
                                         v2_transfer,
                                         mu_mars,
+                                        a_planet=a_mars,
                                         print_v=True)
 print(f"dV: {dv_orbiter}")
 
@@ -166,18 +168,20 @@ print("4a - Epsilon_2:")
 soi_lunar = util.get_SOI(
                   util.D_EARTH_LUNAR, util.LUNAR_MASS, util.MU_EARTH).to(u.km)
 
-energy2 = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
-energy2_inf = util.specific_energy_from_velo_infinity(v_inf)
-print(f"Energy to satisfy conditions: {energy2_inf.round(4)}")
+#energy2 = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
+#energy2_inf = util.specific_energy_from_velo_infinity(v_inf)
+#print(f"Energy to satisfy conditions: {energy2_inf.round(4)}")
+epsilon = util.get_epsilon2(v_inf, soi_lunar, r_lunar_orbit, util.MU_LUNAR)
+print(f"Epsilon2: {epsilon.to(u.deg)}")
 
 print("4b - Orbit Insertion dv and burn direction")
-v_excess = util.velo_from_energy(energy2_inf, 
-                              util.MU_LUNAR, 
-                              r_lunar_orbit)
-v_planet_parked = util.velo_from_radius(util.MU_LUNAR, 
-                                          r_lunar_orbit, 
-                                          r_lunar_orbit)
-dv = v_excess - v_planet_parked
-print(v_excess, v_planet_parked)
-print(f"dv: {dv}\nThe burn will be against the direction of motion.")
+#v_excess = util.velo_from_energy(energy2_inf, 
+#                              util.MU_LUNAR, 
+#                              r_lunar_orbit)
+#v_planet_parked = util.velo_from_radius(util.MU_LUNAR, 
+#                                          r_lunar_orbit, 
+#                                          r_lunar_orbit)
+#dv = v_excess - v_planet_parked
+#print(v_excess, v_planet_parked)
+#print(f"dv: {dv}\nThe burn will be against the direction of motion.")
 

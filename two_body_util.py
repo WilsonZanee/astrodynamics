@@ -1,5 +1,5 @@
 from math import pi, sqrt, cos, factorial, floor, isnan
-
+from functools import partial
 
 from astropy import units as u
 from astropy.units.quantity import Quantity
@@ -69,6 +69,10 @@ def angular_momentum_from_periapsis(vp, rp):
     h = vp*rp
     return h
 
+def angular_momentum_from_rv_angle(r, v, angle):
+    h = r * v * np.cos(angle)
+    return h
+
 #*********************** Velo Calcs *******************************************
 
 def velo_from_energy(energy, meu, radius):
@@ -104,6 +108,14 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
 def eccentricity_from_rarp(ra, rp):
     e = (ra - rp) / (ra + rp)
     return e
+
+def p_from_h_mu(angular_momentum, mu):
+    p = angular_momentum ** 2 / mu
+    return p
+
+def get_rp_from_p_e(p, e):
+    rp = p / (1-e)
+    return rp
 
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
@@ -192,7 +204,31 @@ def get_SOI(dist, small_mass, big_mass):
     return soi
 
 #**************************** Lunar Trajectories ******************************
-#def get_epsilon2(v_lunar, v_inf, lambda1, phi1, gamma1):
+def get_epsilon2(v_inf, r_inf, r_desired, mu):
+    #epsilon_lower = -(np.pi/4)
+    #epsilon_upper = 0#np.pi/4
+    #func = partial(calc_rp_from_inf, 
+    #               v_inf=v_inf.to(u.km/u.s).value, 
+    #               r_inf=r_inf.to(u.km).value, 
+    #               mu=mu.to(u.km**3/u.s**2).value)
+    #epsilon = bisection_method(epsilon_lower, epsilon_upper, func, 
+    #                           r_desired.to(u.km).value, debug=True)
+    energy = specific_energy_from_velo(v_inf, mu, r_inf)
+    vp = velo_from_energy(energy, mu, r_desired)
+    h = angular_momentum_from_periapsis(vp, r_desired)
+    phi = get_flightpath_angle(h, r_inf, v_inf)
+    epsilon = (np.pi/2)*u.rad - phi
+    return epsilon
+
+def calc_rp_from_inf( epsilon, v_inf, r_inf, mu):
+    energy = specific_energy_from_velo(v_inf, mu, r_inf)
+    a = semi_major_axis_from_energy(spec_energy, mu)
+    phi = np.pi/2 - epsilon
+    h = angular_momentum_from_rv_angle(r_inf, v_inf, phi)
+    p = p_from_h_mu(h, mu)
+    e = eccentricity_from_momentum_energy(h, energy, mu)
+    rp = get_rp_from_p_e(p, e)
+    return rp
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
@@ -600,9 +636,31 @@ def ensure_rad(angle):
         rad_angle = angle*u.rad
     return rad_angle
 
-
-
 def get_sec(time_str):
     """Get seconds from time."""
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
+
+def bisection_method(lower_bound, upper_bound, function, desire_result, 
+                     accuracy=1e-6, debug=False):
+    y_mid = 1
+    while abs(y_mid) > accuracy:
+        y_lower = function(lower_bound) - desire_result
+        y_upper = function(upper_bound) - desire_result
+        if y_lower > 0 and y_upper < 0:
+            up = upper_bound
+            upper_bound = lower_bound
+            lower_bound = up
+        midpt = (lower_bound + upper_bound) / 2
+        y_mid = function(midpt) - desire_result
+        if debug:
+            print(f"low: {lower_bound}, yl: {y_lower}")
+            print(f"upper: {upper_bound}, yu: {y_upper}")
+            print(f"midpt: {midpt}, y_mid: {y_mid}")
+        if y_mid > 0:
+            upper_bound = midpt
+        else:
+            lower_bound = midpt
+    return midpt
+
+

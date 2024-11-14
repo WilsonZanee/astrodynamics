@@ -276,11 +276,13 @@ def interplanetary_transfer_dv(r_parked_orbit,
                                transfer_angular_momentum,
                                v_transfer,
                                mu_planet,
+                               a_planet=None,
                                print_v=False):
-    
+    if a_planet is None:
+        a_planet = r_planet
     v_inf = util.get_v_inf(mu_sun, 
                            r_planet, 
-                           r_planet, 
+                           a_planet, 
                            transfer_angular_momentum,
                            v_transfer,
                            prints=print_v)
