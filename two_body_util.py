@@ -26,6 +26,7 @@ LUNAR_RADIUS = 1737.4*u.km
 LUNAR_MASS = 7.349e22*u.kg
 MU_LUNAR = 4903*u.km**3/u.s**2
 D_EARTH_LUNAR = 384400*u.km
+LUNAR_SOI = 66300*u.km
 
 spec_energy = u.km**2/u.s**2
 angular_momentum = u.km**2/u.s
@@ -114,7 +115,7 @@ def p_from_h_mu(angular_momentum, mu):
     return p
 
 def get_rp_from_p_e(p, e):
-    rp = p / (1-e)
+    rp = p / (1+e)
     return rp
 
 #************************ Radius and Velocity Vectors *************************
@@ -205,14 +206,6 @@ def get_SOI(dist, small_mass, big_mass):
 
 #**************************** Lunar Trajectories ******************************
 def get_epsilon2(v_inf, r_inf, r_desired, mu):
-    #epsilon_lower = -(np.pi/4)
-    #epsilon_upper = 0#np.pi/4
-    #func = partial(calc_rp_from_inf, 
-    #               v_inf=v_inf.to(u.km/u.s).value, 
-    #               r_inf=r_inf.to(u.km).value, 
-    #               mu=mu.to(u.km**3/u.s**2).value)
-    #epsilon = bisection_method(epsilon_lower, epsilon_upper, func, 
-    #                           r_desired.to(u.km).value, debug=True)
     energy = specific_energy_from_velo(v_inf, mu, r_inf)
     vp = velo_from_energy(energy, mu, r_desired)
     h = angular_momentum_from_periapsis(vp, r_desired)
@@ -220,15 +213,55 @@ def get_epsilon2(v_inf, r_inf, r_desired, mu):
     epsilon = (np.pi/2)*u.rad - phi
     return epsilon
 
-def calc_rp_from_inf( epsilon, v_inf, r_inf, mu):
+def calc_epsilon2(v_moon, v_inf, vt_lunar, lambda1, phi1, gamma1):
+    term1 = (v_moon / v_inf) * np.cos(lambda1)
+    term2 = -(vt_lunar / v_inf) * np.cos(lambda1 - (phi1 - gamma1))
+    epsilon2 = np.arcsin(term1 + term2)
+    return epsilon2
+
+def calc_rp_from_inf(epsilon, v_inf, r_inf, mu):
     energy = specific_energy_from_velo(v_inf, mu, r_inf)
-    a = semi_major_axis_from_energy(spec_energy, mu)
-    phi = np.pi/2 - epsilon
+    a = semi_major_axis_from_energy(energy, mu)
+    if epsilon > 0:
+        phi = np.pi/2*u.rad - epsilon
+    else:
+        phi = np.pi/2*u.rad + epsilon
     h = angular_momentum_from_rv_angle(r_inf, v_inf, phi)
     p = p_from_h_mu(h, mu)
     e = eccentricity_from_momentum_energy(h, energy, mu)
     rp = get_rp_from_p_e(p, e)
-    return rp
+    return rp.to(u.km)
+
+def get_radius_to_moon(lambda1):
+    D = D_EARTH_LUNAR
+    soi = LUNAR_SOI 
+    r = np.sqrt(D**2 + soi**2 - 2*D*soi*np.cos(lambda1))
+    return r
+
+def get_gamma(soi, r1, lambda1):
+    gamma = np.arcsin((soi / r1) * np.sin(lambda1))
+    return gamma
+
+def calc_rp_dv_from_patch_conic(lambda1, vt_lunar, r_earth_orbit, dv=False):
+    r1 = get_radius_to_moon(lambda1)
+    energy_transfer = specific_energy_from_velo(vt_lunar, 1*MEU_EARTH, r1)
+    vt_earth = velo_from_energy(energy_transfer, 1*MEU_EARTH, r_earth_orbit)
+    ht = angular_momentum_from_periapsis(vt_earth, r_earth_orbit)
+    phi1 = get_flightpath_angle(ht, r1, vt_lunar)
+    gamma1 = get_gamma(LUNAR_SOI, r1, lambda1)
+    v_moon = velo_from_radius(1*MEU_EARTH, D_EARTH_LUNAR, D_EARTH_LUNAR)
+    v_inf = get_plane_change_dv(vt_lunar, v_moon, phi1 - gamma1)
+    epsilon2 = calc_epsilon2(v_moon, v_inf, vt_lunar, lambda1, phi1, gamma1)
+    rp = calc_rp_from_inf(epsilon2, v_inf, LUNAR_SOI, MU_LUNAR)
+    if dv:
+        energy = specific_energy_from_velo(v_inf, MU_LUNAR, LUNAR_SOI)
+        v_excess = velo_from_energy(energy, MU_LUNAR, rp)
+        v_parked = velo_from_radius(MU_LUNAR, rp, rp)
+        dv = v_excess - v_parked
+        return(rp, epsilon2, dv)
+    else:
+        return (rp, epsilon2)
+
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):

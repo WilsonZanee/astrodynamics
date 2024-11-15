@@ -7,7 +7,8 @@ import two_body_util as util
 TOF = False
 gauss = False
 transfer = False
-grav_assist = True
+grav_assist = False
+moon = True
 
 def is_close(val_to_check, correct_val, margin=1e-3):
     vals = [val_to_check, correct_val]
@@ -220,3 +221,8 @@ if grav_assist:
     mu_mars = 4.28284e4*u.km**3/u.s**2
 
     print(util.get_gravity_assist_velo(rp, v_2, v_mars, mu_mars, debug=False))
+
+if moon:
+    print(f"moon_radisu at lambda=30deg: {util.get_radius_to_moon(30*u.deg)}")
+    print(f"rp: {util.calc_rp_from_inf(-6.83*u.deg, 1.644*u.km/u.s, util.LUNAR_SOI, util.MU_LUNAR)}")
+    

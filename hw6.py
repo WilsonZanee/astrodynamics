@@ -168,7 +168,6 @@ print("4a - Epsilon_2:")
 soi_lunar = util.get_SOI(
                   util.D_EARTH_LUNAR, util.LUNAR_MASS, util.MU_EARTH).to(u.km)
 
-#print(f"Energy to satisfy conditions: {energy2_inf.round(4)}")
 epsilon = util.get_epsilon2(v_inf, soi_lunar, r_lunar_orbit, util.MU_LUNAR)
 print(f"Epsilon2: {epsilon.to(u.deg)}")
 
@@ -180,3 +179,42 @@ dv = v_excess - v_parked
 print(v_excess, v_parked)
 print(f"dv: {dv}\nThe burn will be against the direction of motion.")
 
+
+# Question 5: HLS transit to the Moon -----------------------------------------
+print("\n" + "-"*width + "\n")
+print("Question 5: HLS transit to the Moon\n")
+
+print("\n5a - lambda for transfer")
+r_orbit_earth = 200*u.km + 1*util.DU_EARTH
+dt_transfer = 3*u.day
+r_orbit_lunar = 60*u.km + util.LUNAR_RADIUS
+v1 = [0.7, 0.19]*u.km/u.s
+vt_lunar = np.linalg.norm(v1)
+lambda1 = np.arange(42, 53, 0.01)*u.deg
+best_angle = 0
+best_diff = 10e6
+for angle in lambda1:
+      rp, epsilon2 = util.calc_rp_dv_from_patch_conic(angle, 
+                                                   vt_lunar, 
+                                                   r_orbit_earth)
+      alt = rp - util.LUNAR_RADIUS
+      diff = abs(rp - r_orbit_lunar)
+      if diff.value < best_diff and epsilon2.value < 0: # e2<0 --> retrograde
+            best_angle = angle
+            best_diff = diff.value
+            #print(f"angle: {angle}, alt: {alt}, epsilon2: {epsilon2.to(u.deg)}")
+best_rp, ep2, dv = util.calc_rp_dv_from_patch_conic(best_angle, 
+                                                    vt_lunar, 
+                                                    r_orbit_earth,
+                                                    dv=True)
+best_alt = best_rp - util.LUNAR_RADIUS
+print(f"HLS will achieve a lunar orbit of {best_alt} "
+      f"with an lambda1 of {best_angle}")
+print(f"epsilon2: {ep2.to(u.deg)}")
+
+print("\n5a - Lunar Orbit Insertion")
+print(f"dv: {dv}\nThis is a direct burn.")
+
+
+
+      
