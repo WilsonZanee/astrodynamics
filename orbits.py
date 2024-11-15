@@ -191,7 +191,7 @@ class Orbit:
         ra = a*(1-e)
         return ra
     
-    def get_ra(rp, e):
+    def get_ra_fromrp(rp, e):
         ra = ((rp.value * (1 + e)) / (1 - e))*rp.unit
         return ra
 

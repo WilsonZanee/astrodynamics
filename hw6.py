@@ -23,14 +23,14 @@ r_jupiter = 5.2*util.AU_SUN
 jupiter_orbit_r = 69911*u.km + 300*u.km
 mu_jupiter = 1.26713e8 * (u.km**3 / u.s**2)
 
-ra = Orbit.get_ra(r_earth, e_transfer)
+ra = Orbit.get_ra_fromrp(r_earth, e_transfer)
 
 # Question 1a: 
 print(f"The transfer orbit with an eccentricity of 0.7 should work because\n "
       "assuming that earth is at the periapsis, the apoapsis of the oribit\n "
       f"is {ra} which is more than jupiters orbit radius of {r_jupiter}")
 
-# Question 2a:
+# Question 1b:
 # Transfer Phase
 transfer_energy = util.specific_energy_from_rpra(r_earth, ra, mu_sun)\
                     .to(u.km**2 / u.s**2)
@@ -168,20 +168,15 @@ print("4a - Epsilon_2:")
 soi_lunar = util.get_SOI(
                   util.D_EARTH_LUNAR, util.LUNAR_MASS, util.MU_EARTH).to(u.km)
 
-#energy2 = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
-#energy2_inf = util.specific_energy_from_velo_infinity(v_inf)
 #print(f"Energy to satisfy conditions: {energy2_inf.round(4)}")
 epsilon = util.get_epsilon2(v_inf, soi_lunar, r_lunar_orbit, util.MU_LUNAR)
 print(f"Epsilon2: {epsilon.to(u.deg)}")
 
-print("4b - Orbit Insertion dv and burn direction")
-#v_excess = util.velo_from_energy(energy2_inf, 
-#                              util.MU_LUNAR, 
-#                              r_lunar_orbit)
-#v_planet_parked = util.velo_from_radius(util.MU_LUNAR, 
-#                                          r_lunar_orbit, 
-#                                          r_lunar_orbit)
-#dv = v_excess - v_planet_parked
-#print(v_excess, v_planet_parked)
-#print(f"dv: {dv}\nThe burn will be against the direction of motion.")
+print("\n4b - Orbit Insertion dv and burn direction")
+energy = util.specific_energy_from_velo(v_inf, util.MU_LUNAR, soi_lunar)
+v_excess = util.velo_from_energy(energy, util.MU_LUNAR, r_lunar_orbit)
+v_parked = util.velo_from_radius(util.MU_LUNAR, r_lunar_orbit, r_lunar_orbit)
+dv = v_excess - v_parked
+print(v_excess, v_parked)
+print(f"dv: {dv}\nThe burn will be against the direction of motion.")
 
