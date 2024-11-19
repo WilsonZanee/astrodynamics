@@ -1,5 +1,5 @@
 from math import pi, sqrt, cos, factorial, floor, isnan
-
+from functools import partial
 
 from astropy import units as u
 from astropy.units.quantity import Quantity
@@ -20,7 +20,13 @@ du_tu = (MEU_EARTH**(1/2)/DU_EARTH**(1/2), DUTU_EARTH,
 AU_SUN = u.def_unit("Au Sun", 1.496e8*u.km) 
 TU_SUN = u.def_unit("Tu Sun", 58.132821*u.d) 
 AUTU_SUN = u.def_unit("Au/Tu Sun", 29.784852*u.km/u.s) 
-MEU_SUN = u.def_unit("meu Sun", 1.3271544e11*u.km**3/u.s**2)
+MEU_SUN = u.def_unit("mu Sun", 1.3271544e11*u.km**3/u.s**2)
+
+LUNAR_RADIUS = 1737.4*u.km
+LUNAR_MASS = 7.349e22*u.kg
+MU_LUNAR = 4903*u.km**3/u.s**2
+D_EARTH_LUNAR = 384400*u.km
+LUNAR_SOI = 66300*u.km
 
 spec_energy = u.km**2/u.s**2
 angular_momentum = u.km**2/u.s
@@ -48,9 +54,13 @@ def specific_energy_from_velo(velo, meu, radius):
     energy = ((velo**2)/2) - (meu/radius)
     return energy
 
+def specific_energy_from_velo_infinity(velo):
+    energy = ((velo**2)/2)
+    return energy
+
 def specific_energy_from_rpra(rp, ra, meu):
     energy = -meu / (ra + rp)
-    return energy.to(SPEC_E_EARTH)
+    return energy.to(u.km**2/u.s**2)
 
 def angular_momentum_from_p(p, meu):
     momentum = np.sqrt(p*meu) 
@@ -60,15 +70,19 @@ def angular_momentum_from_periapsis(vp, rp):
     h = vp*rp
     return h
 
+def angular_momentum_from_rv_angle(r, v, angle):
+    h = r * v * np.cos(angle)
+    return h
+
 #*********************** Velo Calcs *******************************************
 
 def velo_from_energy(energy, meu, radius):
     velo = np.sqrt(2*(energy + meu/radius))
-    return velo.to(DUTU_EARTH)
+    return velo.to(u.km/u.s)
 
 def velo_from_radius(meu, radius, semi_major_axis):
     velo = np.sqrt((2*meu/radius) - (meu/semi_major_axis))
-    return velo.to(DUTU_EARTH)
+    return velo.to(u.km/u.s)
 
 def get_escape_velo(meu, radius):
     velo = np.sqrt(2*meu/radius)
@@ -76,10 +90,6 @@ def get_escape_velo(meu, radius):
 
 def get_plane_change_dv(v1, v2, di):
     di = ensure_rad(di)
-#    v1sqr = v1**2
-#    v2sqr = v2**2
-#    negterm = -2*v1*v2*cos(di.value)
-#    dv = np.sqrt(v1sqr + v2sqr + negterm)
     dv = np.sqrt(v1**2 + v2**2 - 2*v1*v2*cos(di.value))
     return dv
 
@@ -96,10 +106,162 @@ def eccentricity_from_momentum_energy(angular_momentum, energy, meu):
     e = sqrt(1 + (2*angular_momentum**2*energy/meu**2))
     return e
 
+def eccentricity_from_rarp(ra, rp):
+    e = (ra - rp) / (ra + rp)
+    return e
+
+def p_from_h_mu(angular_momentum, mu):
+    p = angular_momentum ** 2 / mu
+    return p
+
+def get_rp_from_p_e(p, e):
+    rp = p / (1+e)
+    return rp
+
 #************************ Radius and Velocity Vectors *************************
 def orbit_radius_from_p_eccentricity_true_anomaly(e, p, theta):
     r = p/(1+e*np.cos(theta))
     return r
+
+#*********************** Interplanetary Trajectories **************************
+def get_sphere_of_influence(large_mass, small_mass, distance):
+    r = distance * (small_mass / large_mass) ** (2/5)
+    return r
+
+def get_flightpath_angle(angular_momentum, r, v, print_ang=False):
+    cos_val = (angular_momentum.to(u.km**2/u.s) / (r.to(u.km) * v.to(u.km/u.s)))
+    if cos_val > 1 or cos_val < -1:
+        angle = 0*u.rad
+    else:
+        angle = np.arccos((angular_momentum.to(u.km**2/u.s) / (r * v)))
+    if print_ang:
+        print(f"h: {angular_momentum}")
+        print(f"r,v: {r} {v}")
+        print(f"cos_val: {cos_val}")
+        print(f"Flightpath angle raw: {angle.to(u.deg)}")
+    if angle > (np.pi / 2)*u.rad:
+        angle = angle - (np.pi / 2)*u.rad
+    elif angle < (-np.pi / 2)*u.rad:
+        angle = angle + (np.pi / 2)*u.rad
+    if print_ang:
+        print(f"Flightpath angle final: {angle.to(u.deg)}")
+    return angle
+
+def get_v_inf(mu, r_planet, a_planet, transfer_angular_momentum, v_transfer,
+              prints=False):
+    v_planet = velo_from_radius(mu, r_planet, a_planet)
+    flightpath_angle = get_flightpath_angle(transfer_angular_momentum, 
+                                            r_planet, 
+                                            v_transfer,
+                                            print_ang=prints)
+    v_inf = get_plane_change_dv(v_transfer, v_planet, flightpath_angle)
+    if prints:
+        print(f"v_planet: {v_planet}")
+        print(f"v transfer: {v_transfer.to(u.km/u.s)}")
+        print(f"v_inf: {v_inf.to(u.km/u.s)}")
+    return v_inf
+
+def get_best_turn_angle(rp, v_inf, mu, debug=False):
+    if debug:
+        print(rp)
+        print(v_inf.to(u.km/u.s))
+        print(mu)
+    e = (1 + ((rp * v_inf**2) / mu))
+    delta = 2*np.arcsin(1 / e)
+    if debug:
+        print(f"Max Delta: {delta.to(u.deg)}")
+        print(f"e: {e}")
+    return delta, e
+
+def get_gravity_assist_velo(rp, v_transfer, v_planet, mu, debug=False):
+    v_inf = v_transfer - v_planet
+    v_inf_magnitude = np.linalg.norm(v_inf)
+    d, e = get_best_turn_angle(rp, v_inf_magnitude, mu, debug=debug)
+    R = np.array([[np.cos(d), -np.sin(d), 0],
+                  [np.sin(d), np.cos(d), 0],
+                  [0, 0, 1]])
+    v_inf2 = np.dot(R, v_inf)
+    v2_mag = np.linalg.norm(v_inf2)
+    if debug:
+        print(f"v2_mag: {v2_mag}")
+        print(f"v2: {v_inf2}")
+    v_final = v_inf2 + v_planet
+    v_final_mag = np.linalg.norm(v_final)
+    return v_final, v_final_mag
+
+def get_offset_dist(r_target, v_inf, mu_body):
+    offset_dist = (r_target / v_inf) * \
+                    np.sqrt(v_inf ** 2 + (2 * mu_body / r_target))
+    return offset_dist
+
+def angular_momentum_enter_SOI(r_target, v_inf, mu_body, delta=None):
+    if delta is None:    
+        delta = get_offset_dist(r_target, v_inf, mu_body)
+    h = v_inf*delta
+    return h
+
+def get_SOI(dist, small_mass, big_mass):
+    soi = dist * (small_mass / big_mass) ** (2/5)
+    return soi
+
+#**************************** Lunar Trajectories ******************************
+def get_epsilon2(v_inf, r_inf, r_desired, mu):
+    energy = specific_energy_from_velo(v_inf, mu, r_inf)
+    vp = velo_from_energy(energy, mu, r_desired)
+    h = angular_momentum_from_periapsis(vp, r_desired)
+    phi = get_flightpath_angle(h, r_inf, v_inf)
+    epsilon = (np.pi/2)*u.rad - phi
+    return epsilon
+
+def calc_epsilon2(v_moon, v_inf, vt_lunar, lambda1, phi1, gamma1):
+    term1 = (v_moon / v_inf) * np.cos(lambda1)
+    term2 = -(vt_lunar / v_inf) * np.cos(lambda1 - (phi1 - gamma1))
+    epsilon2 = np.arcsin(term1 + term2)
+    return epsilon2
+
+def calc_rp_from_inf(epsilon, v_inf, r_inf, mu):
+    energy = specific_energy_from_velo(v_inf, mu, r_inf)
+    a = semi_major_axis_from_energy(energy, mu)
+    if epsilon > 0:
+        phi = np.pi/2*u.rad - epsilon
+    else:
+        phi = np.pi/2*u.rad + epsilon
+    h = angular_momentum_from_rv_angle(r_inf, v_inf, phi)
+    p = p_from_h_mu(h, mu)
+    e = eccentricity_from_momentum_energy(h, energy, mu)
+    rp = get_rp_from_p_e(p, e)
+    return rp.to(u.km)
+
+def get_radius_to_moon(lambda1):
+    D = D_EARTH_LUNAR
+    soi = LUNAR_SOI 
+    r = np.sqrt(D**2 + soi**2 - 2*D*soi*np.cos(lambda1))
+    return r
+
+def get_gamma(soi, r1, lambda1):
+    gamma = np.arcsin((soi / r1) * np.sin(lambda1))
+    return gamma
+
+def calc_rp_dv_from_patch_conic(lambda1, vt_lunar, r_earth_orbit, dv=False):
+    r1 = get_radius_to_moon(lambda1)
+    energy_transfer = specific_energy_from_velo(vt_lunar, 1*MEU_EARTH, r1)
+    vt_earth = velo_from_energy(energy_transfer, 1*MEU_EARTH, r_earth_orbit)
+    ht = angular_momentum_from_periapsis(vt_earth, r_earth_orbit)
+    phi1 = get_flightpath_angle(ht, r1, vt_lunar)
+    gamma1 = get_gamma(LUNAR_SOI, r1, lambda1)
+    v_moon = velo_from_radius(1*MEU_EARTH, D_EARTH_LUNAR, D_EARTH_LUNAR)
+    v_inf = get_plane_change_dv(vt_lunar, v_moon, phi1 - gamma1)
+    epsilon2 = calc_epsilon2(v_moon, v_inf, vt_lunar, lambda1, phi1, gamma1)
+    rp = calc_rp_from_inf(epsilon2, v_inf, LUNAR_SOI, MU_LUNAR)
+    if dv:
+        energy = specific_energy_from_velo(v_inf, MU_LUNAR, LUNAR_SOI)
+        v_excess = velo_from_energy(energy, MU_LUNAR, rp)
+        v_parked = velo_from_radius(MU_LUNAR, rp, rp)
+        dv = v_excess - v_parked
+        return(rp, epsilon2, dv)
+    else:
+        return (rp, epsilon2)
+
 
 #************************ Time of Flight *************************
 def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
@@ -141,7 +303,7 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     "En+1": eNew_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
+    #print(df) 
     theta2 = np.arccos((np.cos(guess_E*u.rad) - e) / (1 - e*np.cos(guess_E*u.rad)))
     if guess_E > np.pi and theta2.value < np.pi:
         theta2 = (2*np.pi - theta2.value)*u.rad
@@ -216,7 +378,7 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
-    print(df) 
+    #print(df) 
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = f * r_init + g * v_init
@@ -507,9 +669,31 @@ def ensure_rad(angle):
         rad_angle = angle*u.rad
     return rad_angle
 
-
-
 def get_sec(time_str):
     """Get seconds from time."""
     h, m, s = time_str.split(':')
     return int(h) * 3600 + int(m) * 60 + int(s)
+
+def bisection_method(lower_bound, upper_bound, function, desire_result, 
+                     accuracy=1e-6, debug=False):
+    y_mid = 1
+    while abs(y_mid) > accuracy:
+        y_lower = function(lower_bound) - desire_result
+        y_upper = function(upper_bound) - desire_result
+        if y_lower > 0 and y_upper < 0:
+            up = upper_bound
+            upper_bound = lower_bound
+            lower_bound = up
+        midpt = (lower_bound + upper_bound) / 2
+        y_mid = function(midpt) - desire_result
+        if debug:
+            print(f"low: {lower_bound}, yl: {y_lower}")
+            print(f"upper: {upper_bound}, yu: {y_upper}")
+            print(f"midpt: {midpt}, y_mid: {y_mid}")
+        if y_mid > 0:
+            upper_bound = midpt
+        else:
+            lower_bound = midpt
+    return midpt
+
+

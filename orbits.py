@@ -190,6 +190,10 @@ class Orbit:
     def get_rp(a, e):
         ra = a*(1-e)
         return ra
+    
+    def get_ra_fromrp(rp, e):
+        ra = ((rp.value * (1 + e)) / (1 - e))*rp.unit
+        return ra
 
     # Finding Orbital Elements
 
@@ -204,7 +208,7 @@ class Orbit:
         theta = Orbit.get_theta(r, e_vector, v)
         a = Orbit.get_a(angular_momentum, e, meu)
 
-        oe = OrbitalElements(a, e, i, raan, arg_periapsis, theta)
+        oe = OrbitalElements(a.to(r.unit), e.value, i, raan, arg_periapsis, theta)
         return oe
     
     def get_a(angular_momentum, e, meu):
@@ -265,4 +269,34 @@ class Orbit:
     def get_v_vector_perifocal(meu, p, theta, e):
         v = np.sqrt(meu/p)*np.matrix([-np.sin(theta), (e+np.cos(theta)), 0])
         return v
+    
+def interplanetary_transfer_dv(r_parked_orbit, 
+                               r_planet, 
+                               mu_sun, 
+                               transfer_angular_momentum,
+                               v_transfer,
+                               mu_planet,
+                               a_planet=None,
+                               print_v=False):
+    if a_planet is None:
+        a_planet = r_planet
+    v_inf = util.get_v_inf(mu_sun, 
+                           r_planet, 
+                           a_planet, 
+                           transfer_angular_momentum,
+                           v_transfer,
+                           prints=print_v)
+    energy_infinity = util.specific_energy_from_velo_infinity(v_inf)
+    v_excess = util.velo_from_energy(energy_infinity, 
+                                                mu_planet, 
+                                                r_parked_orbit)
+    v_planet_parked = util.velo_from_radius(mu_planet, 
+                                            r_parked_orbit, 
+                                            r_parked_orbit)
+    if print_v:
+        print(f"V excess: {v_excess.to(u.km/u.s)}")
+        print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
 
+
+    dv = v_excess - v_planet_parked
+    return dv
