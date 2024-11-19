@@ -381,8 +381,8 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     #print(df) 
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
-    r_final = f * r_init + g * v_init
-    v_final = f_dot * r_init + g_dot * v_init
+    r_final = (f * r_init + g * v_init).to(r_init.unit)
+    v_final = (f_dot * r_init + g_dot * v_init).to(v_init.unit)
 
     return (r_final, v_final)
 

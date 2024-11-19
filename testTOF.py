@@ -4,11 +4,12 @@ import astropy.units as u
 from orbits import Orbit, OrbitalElements, interplanetary_transfer_dv
 import two_body_util as util
 
+OE = False
 TOF = False
 gauss = False
 transfer = False
 grav_assist = False
-moon = True
+moon = False
 
 def is_close(val_to_check, correct_val, margin=1e-3):
     vals = [val_to_check, correct_val]
@@ -23,6 +24,44 @@ def is_close(val_to_check, correct_val, margin=1e-3):
         close = False
     return close
 
+if OE:
+    p = 4.019646*util.DU_EARTH
+    a = 4.23*util.DU_EARTH
+    e = 0.223
+    i = 16*u.deg
+    raan = 298*u.deg
+    omega = 26*u.deg
+    theta = 35*u.deg
+
+    r = [3.2966, -0.1134, 0.8194]*util.DU_EARTH
+    v = [0.0624, 0.5825, 0.0942]*util.DUTU_EARTH
+
+    oe = OrbitalElements(a, e, i, raan, omega, theta)
+    orbit = Orbit(orbital_elements=oe, meu=1*util.MEU_EARTH)
+    print(f"{orbit.r_vector=}, {orbit.v_vector.to(util.DUTU_EARTH)=}")
+
+    orbit = Orbit(r_vector = r, v_vector = v, meu=1*util.MEU_EARTH)
+    print(orbit.orbital_elements)
+
+
+    p = 0.864248*util.DU_EARTH
+    a = 1.22*util.DU_EARTH
+    e = 0.54
+    i = 165*u.deg
+    raan = 192*u.deg
+    omega = 40*u.deg
+    theta = 340*u.deg
+
+    r = [-0.5664, 0.0733, 0.0508]*util.DU_EARTH
+    v = [0.4327, 1.5296, 0.3768]*util.DUTU_EARTH
+
+    oe = OrbitalElements(a, e, i, raan, omega, theta)
+    orbit = Orbit(orbital_elements=oe, meu=1*util.MEU_EARTH)
+    print(f"{orbit.r_vector=}, {orbit.v_vector.to(util.DUTU_EARTH)=}")
+
+    orbit = Orbit(r_vector=r, v_vector=v, meu=1*util.MEU_EARTH)
+    print(orbit.orbital_elements)
+
 if TOF:
     # TOF Kepler
     print("TOF Kepler")
@@ -34,7 +73,6 @@ if TOF:
 
     theta_final = util.predict_location(e, a, theta0, tof, 1, meu)
     print(theta_final)
-
     print(util.time_of_flight_kepler(e, a, theta0, theta_final, meu, 1).to(u.hr))
 
     print("TOF Kepler")
@@ -46,7 +84,6 @@ if TOF:
 
     theta_final = util.predict_location(e, a, theta0, tof, 0, meu)
     print(theta_final)
-
     print(util.time_of_flight_kepler(e, a, theta0, theta_final, meu, 0).to(u.hr))
 
     # TOF Ellipse
