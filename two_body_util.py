@@ -189,9 +189,9 @@ def get_gravity_assist_velo(rp, v_transfer, v_planet, mu, debug=False):
     v_final_mag = np.linalg.norm(v_final)
     return v_final, v_final_mag
 
-def get_offset_dist(r_target, v_inf, mu_body):
-    offset_dist = (r_target / v_inf) * \
-                    np.sqrt(v_inf ** 2 + (2 * mu_body / r_target))
+def get_offset_dist(rp, v_inf, mu_body):
+    offset_dist = (rp / v_inf) * \
+                    np.sqrt(v_inf ** 2 + (2 * mu_body / rp))
     return offset_dist
 
 def angular_momentum_enter_SOI(r_target, v_inf, mu_body, delta=None):
