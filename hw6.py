@@ -138,10 +138,30 @@ v_atmospheric_entry = (h_lander/\
 r_mars_surf = 3380*u.km
 offset_dist_surf = util.get_offset_dist(r_mars_surf, v_inf_mars, mu_mars)
 offset_dist_atmo = util.get_offset_dist(r_final_lander, v_inf_mars, mu_mars)
+print(offset_dist_surf, offset_dist_atmo)
 offset_range = offset_dist_atmo - offset_dist_surf
 
 print(f"Velo at Mars Atmospheric Entry: {v_atmospheric_entry}")
-print(f"Offset range for Mars Lander: {offset_range}")
+print(f"Offset range for Mars Lander: {offset_range}\n")
+
+v2_transfer = np.linalg.norm(v_at_mars)
+print(f"{transfer_h.to(u.km**2/u.s)=}")
+v_inf_mars = util.get_v_inf(mu_sun, np.linalg.norm(r_at_mars), 1.524*util.AU_SUN, 
+                            transfer_h, v2_transfer, prints=True)
+print(f"{v_inf_mars.to(u.km/u.s)=}")
+energy = util.specific_energy_from_velo_infinity(v_inf_mars)
+v_atmospheric_entry = util.velo_from_energy(energy, mu_mars, r_final_lander)
+h_lander = util.angular_momentum_from_rv_angle(r_final_lander, 
+                                               v_atmospheric_entry, 
+                                               flightpath_angle_lander)
+r_mars_surf = 3380*u.km
+offset_dist_surf = util.get_offset_dist(r_mars_surf, v_inf_mars, mu_mars)
+offset_dist_atmo = h_lander / v_inf_mars
+print(offset_dist_surf, offset_dist_atmo.to(u.km))
+offset_range = offset_dist_atmo - offset_dist_surf
+
+print(f"Velo at Mars Atmospheric Entry: {v_atmospheric_entry}")
+print(f"Offset range for Mars Lander: {offset_range.to(u.km)}\n")
 
 # 3e - determine dv required for mars orbiter insertion
 print("\n3e - dV required for mars orbiter insertion")
