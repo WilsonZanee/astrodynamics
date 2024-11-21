@@ -304,3 +304,28 @@ def interplanetary_transfer_dv(r_parked_orbit,
 
     dv = v_excess - v_planet_parked
     return dv
+
+def interplanetary_transfer_dv_vectors(r_parked_orbit, 
+                                       v_transfer,
+                                       v_planet,
+                                       mu_planet,
+                                       print_v=False):
+        
+    v_inf = np.linalg.norm(abs(v_planet - v_transfer))
+    if print_v:
+        print(f"{v_transfer=}, {v_planet=}")
+        print(f"{v_planet-v_transfer=}, {v_inf=}")
+    energy_infinity = util.specific_energy_from_velo_infinity(v_inf)
+    v_excess = util.velo_from_energy(energy_infinity, 
+                                                mu_planet, 
+                                                r_parked_orbit)
+    v_planet_parked = util.velo_from_radius(mu_planet, 
+                                            r_parked_orbit, 
+                                            r_parked_orbit)
+    if print_v:
+        print(f"V excess: {v_excess.to(u.km/u.s)}")
+        print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
+
+
+    dv = v_excess - v_planet_parked
+    return dv
