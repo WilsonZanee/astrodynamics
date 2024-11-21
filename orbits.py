@@ -22,12 +22,16 @@ class OrbitalElements:
         self.theta = theta
 
     def __str__(self):
-        string = (f"Semi-Major Axis: {self.a}\n"
-                f"Eccentricity: {self.e}\n"
-                f"Inclination: {self.i} = {(np.rad2deg(self.i)).to(u.deg)}\n"
-                f"RAAN: {self.raan} = {(np.rad2deg(self.raan)).to(u.deg)}\n"
-                f"Argument of Periapsis: {self.omega} = {(np.rad2deg(self.omega)).to(u.deg)}\n"
-                f"True Anomaly: {self.theta} = {(np.rad2deg(self.theta)).to(u.deg)}\n"
+        string = (f"Semi-Major Axis: {self.a:.5f}\n"
+                f"Eccentricity: {self.e:.5f}\n"
+                f"Inclination: {self.i:.5f} = "
+                    f"{(np.rad2deg(self.i)).to(u.deg):.1f}\n"
+                f"RAAN: {self.raan:.5f} = "
+                    f"{(np.rad2deg(self.raan)).to(u.deg):.1f}\n"
+                f"Argument of Periapsis: {self.omega:.5f} = "
+                    f"{(np.rad2deg(self.omega)).to(u.deg):.1f}\n"
+                f"True Anomaly: {self.theta:.5f} = "
+                    f"{(np.rad2deg(self.theta)).to(u.deg):.1f}\n"
         )
         return string
     
