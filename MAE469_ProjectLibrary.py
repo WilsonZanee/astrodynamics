@@ -7,6 +7,12 @@ import math
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import traceback
+
+from astropy import units as u
+
+import two_body_util as util
+from orbits import interplanetary_transfer_dv_vectors, Orbit
 
 # ---- FUNCTIONS ----
 
@@ -602,3 +608,80 @@ def launchDate(departure_data, arrival_data):
             i = i+1
             print(earth_departure_date)
     return
+
+def earth_to_mars_dv(r_earth1, v_earth1, r_mars1, v_mars1, dt12, r_parked_e1,
+                     r_parked_m2, debug=False):
+    # 1 = Departure from Earth 
+    # 2 = Arrival at Mars after 210 days
+
+    mu_sun = 1*util.MEU_SUN
+    mu_earth = 1*util.MEU_EARTH
+
+    r_mars2, v_mars2 = util.time_of_flight_universal_var(r_mars1, v_mars1, dt12, 
+                                                        mu_sun, debug=debug)
+    flight_velo_vectors_12 = util.get_velo_gauss_problem(r_earth1, r_mars2, dt12,
+                                                        mu_sun, 
+                                                        print_convergence_table=debug
+                                                        )["short"]
+
+    orbit1 = Orbit(r_vector=r_earth1, v_vector=flight_velo_vectors_12["v1"],
+                meu=mu_sun)
+    orbit2 = Orbit(r_vector=r_mars2, v_vector=flight_velo_vectors_12["v2"],
+                meu=mu_sun)
+
+    dv1 = interplanetary_transfer_dv_vectors(r_parked_e1,
+                                            flight_velo_vectors_12["v1"].to(util.AUTU_SUN),
+                                            v_earth1,
+                                            mu_earth,
+                                            print_v=debug)
+
+    mu_mars = mu_mars = 4.28284e4*u.km**3/u.s**2
+    dv2 = interplanetary_transfer_dv_vectors(r_parked_m2,
+                                            flight_velo_vectors_12["v2"].to(util.AUTU_SUN),
+                                            v_mars2,
+                                            mu_mars,
+                                            print_v=debug)
+    dv_total = dv1 + dv2
+    if debug:
+        print(f"{flight_velo_vectors_12=}")
+        print("\nOrbital Elements for Earth to Mars trajectory: ")
+        print(orbit1.orbital_elements)
+        print(f"True Anomaly at Mars: {orbit2.orbital_elements.theta.to(u.deg):.1f}")
+        print(f"{dv1=}\n")
+        print(f"{dv2=}\n")
+        print(f"\nTotal dv for the Mars Mission: {dv_total:.3f}")
+    return dv_total
+
+def find_best_dv(start_date, end_date, step_size, repochE, vepochE,
+                 repochM, vepochM, mu, transfer_length, earth_orbit, 
+                 mars_orbit, epoch, debug=False):
+    
+    start_TOF = ((abs((start_date - epoch).total_seconds())*u.s)).to(u.day)
+    end_TOF = ((abs((end_date - epoch).total_seconds())*u.s)).to(u.day)
+    time_options = np.arange(start_TOF.value, end_TOF.value, 
+                             step_size.to(u.day).value)
+    best_date = datetime.fromisoformat('2025-12-25 08:37:00.000')
+    best_dv = 100000*u.km/u.s
+
+    #test_date = datetime.fromisoformat('2025-01-01 12:00:00.000')
+    #time_options = [(((abs((test_date - epoch).total_seconds())*u.s)).to(u.day)).value]
+
+    for TOF in time_options:
+        TOF_day = (TOF*u.day)
+        TOF_TU = TOF_day.to(util.TU_SUN)
+        date = epoch + timedelta(days=TOF_day.value)
+        try:
+            [r2E,v2E] = universalTOF_SCZ(repochE,vepochE,TOF_TU.value,mu)
+            [r2M,v2M] = universalTOF_SCZ(repochM,vepochM,TOF_TU.value,mu)
+            dv = earth_to_mars_dv(r2E*util.AU_SUN, v2E*util.AUTU_SUN, 
+                                    r2M*util.AU_SUN, v2M*util.AUTU_SUN, 
+                                    transfer_length, earth_orbit, mars_orbit,
+                                    debug=debug)
+            print(f"{date=}, {dv=}")
+            if dv < best_dv:
+                best_date = date
+                best_dv = dv
+        except Exception as e:
+            if debug:
+                traceback.print_exc()
+    return best_date, best_dv

@@ -5,7 +5,13 @@
 # ---- IMPORT LIBRARIES ----
 import math
 import numpy as np
+from datetime import datetime
+
+from astropy import units as u
+
+import two_body_util as util
 import MAE469_ProjectLibrary as PROJ
+
 
 
 # ---- PLANETARY ORBITAL ELEMENT INPUTS -----
@@ -58,9 +64,44 @@ print('  Mars  |        ',np.around(r2M,4), '        |         ',np.around(v2M,4
 print('Jupiter |        ',np.around(r2J,4), '        |         ',np.around(v2J,4), '         |       ', np.around(TrueAnomalyJ2,4),'\n')
 
 # ==== STEP 2 : Determine Launch Date Between 2021-2030 For 190-Day Transfer from Earth to Mars ====
-PROJ.plotSynodicPeriod()
-[first_guess_departure, first_guess_arrival] = PROJ.reasonableLaunchSearch('1/1/21 12:00')
-print(first_guess_departure)
-[rDeparture,rArrival] = PROJ.launchDatePositions(first_guess_departure, first_guess_arrival)
-print(rDeparture)
-print(rArrival)
+#PROJ.plotSynodicPeriod()
+#[first_guess_departure, first_guess_arrival] = PROJ.reasonableLaunchSearch('1/1/21 12:00')
+#print(first_guess_departure)
+#[rDeparture,rArrival] = PROJ.launchDatePositions(first_guess_departure, first_guess_arrival)
+#print(rDeparture)
+#print(rArrival)
+
+dt = 190*u.day
+epoch = datetime.fromisoformat('2000-01-01 11:58:00.000')
+earth_orbit = 200*u.km + 1*util.DU_EARTH
+mars_orbit = 1000*u.km + 3389.5*u.km
+
+start_date = datetime.fromisoformat('2021-01-01 12:00:00.000')
+end_date = datetime.fromisoformat('2030-01-01 12:00:00.000')
+step_size = 10*u.day
+
+best_date, best_dv = PROJ.find_best_dv(start_date, end_date, step_size,
+                                       repochE, vepochE, repochM, vepochM,
+                                       mu, dt, earth_orbit, mars_orbit, epoch)
+
+best_TOF = ((abs((best_date - epoch).total_seconds())*u.s).to(util.TU_SUN)).value
+
+[r2E,v2E] = PROJ.universalTOF_SCZ(repochE,vepochE,best_TOF,mu)
+[r2M,v2M] = PROJ.universalTOF_SCZ(repochM,vepochM,best_TOF,mu)   
+
+PROJ.earth_to_mars_dv(r2E*util.AU_SUN, v2E*util.AUTU_SUN, 
+                        r2M*util.AU_SUN, v2M*util.AUTU_SUN, 
+                        dt, earth_orbit, mars_orbit,
+                        debug=True)
+
+[e_scalarE2, aE, inclinationE2, TrueAnomalyE2, longAscendNodeE2, ArgOfPeriE2] = PROJ.rvToOrbitalElements(r2E,v2E,mu,table,distance,time)
+[e_scalarM2, aM2, inclinationM2, TrueAnomalyM2, longAscendNodeM2, ArgOfPeriM2] = PROJ.rvToOrbitalElements(r2M,v2M,mu,table,distance,time)
+
+print('\nHeliocentric Position and Velocity of Planetary Objects at Transfer Start')
+print('-------------------------------------------------------')
+print('        |    Heliocentric Position Vector (r) %s    |   Heliocentric Velocity Vector (v) %s/%s    | True Anomaly (degrees)' % (distance,distance,time))
+print('--------------------------------------------------------------------------------------------------------------------------')
+print(' Earth  |        ',np.around(r2E,4), '        |         ',np.around(v2E,4), '         |       ', np.around(TrueAnomalyE2,4))
+print('  Mars  |        ',np.around(r2M,4), '        |         ',np.around(v2M,4), '         |       ', np.around(TrueAnomalyM2,4))
+print(best_date)
+print(f"dV for transfer: {best_dv}")

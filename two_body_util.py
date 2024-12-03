@@ -327,16 +327,16 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     spec_energy = specific_energy_from_velo(v0, meu, r0)
     a = semi_major_axis_from_energy(spec_energy, meu)
     r_dot_v = np.dot(r_init, v_init)
+    if a > 0:
+        x_guess = (((np.sqrt(meu)*dt)/a).to(r_init.unit**(1/2)))
+    if a < 0:
+        x_guess = hyperbolic_guess*r_init.unit**(1/2)
     if debug:
         print(f"{r0=}")
         print(f"{v0=}")
         print(f"{spec_energy=}")
         print(f"{a=}")
-    if a > 0:
-        x_guess = ((np.sqrt(meu)*dt)/a)
-    if a < 0:
-        x_guess = hyperbolic_guess*r_init.unit**(1/2)
-
+        print(f"{x_guess=}")
     x_list = []
     z_list = []
     S_list = []
@@ -387,6 +387,8 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
+    if debug:
+        print(df)
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = (f * r_init + g * v_init).to(r_init.unit)
