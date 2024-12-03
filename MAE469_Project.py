@@ -7,6 +7,7 @@ import math
 import numpy as np
 import MAE469_ProjectLibrary as PROJ
 
+
 # ---- PLANETARY ORBITAL ELEMENT INPUTS -----
 # Note: a (AU) , e (n/a) , i (deg) , raan (deg) , omega (deg) , theta (deg)
 # -- EARTH --
@@ -55,6 +56,11 @@ print('-------------------------------------------------------------------------
 print(' Earth  |        ',np.around(r2E,4), '        |         ',np.around(v2E,4), '         |       ', np.around(TrueAnomalyE2,4))
 print('  Mars  |        ',np.around(r2M,4), '        |         ',np.around(v2M,4), '         |       ', np.around(TrueAnomalyM2,4))
 print('Jupiter |        ',np.around(r2J,4), '        |         ',np.around(v2J,4), '         |       ', np.around(TrueAnomalyJ2,4),'\n')
- 
-# THis is as comment
-print("This is a comment")
+
+# ==== STEP 2 : Determine Launch Date Between 2021-2030 For 190-Day Transfer from Earth to Mars ====
+PROJ.plotSynodicPeriod()
+[first_guess_departure, first_guess_arrival] = PROJ.reasonableLaunchSearch('1/1/21 12:00')
+print(first_guess_departure)
+[rDeparture,rArrival] = PROJ.launchDatePositions(first_guess_departure, first_guess_arrival)
+print(rDeparture)
+print(rArrival)
