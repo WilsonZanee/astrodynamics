@@ -264,11 +264,14 @@ def calc_rp_dv_from_patch_conic(lambda1, vt_lunar, r_earth_orbit, dv=False):
 
 
 #************************ Time of Flight *************************
-def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0):
+def time_of_flight_kepler(e, a, theta1, theta2, meu, pass_periapsis=0, 
+                          debug=False):
     E1 = get_eccentric_anomaly(e, theta1).value
     E2 = get_eccentric_anomaly(e, theta2).value
     n = np.sqrt(meu/(a.to(DU_EARTH))**3).to(1/u.s)
-
+    if debug:
+        print(f"{E1=}, {E2=}")
+        print(f"{n=}")
     dt = (2*np.pi*pass_periapsis + (E2 - e*np.sin(E2)) - (E1 - e*np.sin(E1))) / n
     return dt
 
@@ -316,17 +319,23 @@ def predict_location(e, a, theta1, dt, pass_periapsis,
     return theta2
 
 def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True, 
-                                 max_iter=30, hyperbolic_guess=2):
+                                 max_iter=30, hyperbolic_guess=2, 
+                                 debug=False):
     margin = 1e-7
-    r0 = np.linalg.norm(r_init).to(DU_EARTH)
-    v0 = np.linalg.norm(v_init).to(DUTU_EARTH)
-    spec_energy = specific_energy_from_velo(v0, meu, r0).to(SPEC_E_EARTH)
-    a = semi_major_axis_from_energy(spec_energy, meu).to(DU_EARTH)
-    r_dot_v = np.dot(r_init, v_init).to(MOMENTUM_EARTH)
+    r0 = np.linalg.norm(r_init)
+    v0 = np.linalg.norm(v_init)
+    spec_energy = specific_energy_from_velo(v0, meu, r0)
+    a = semi_major_axis_from_energy(spec_energy, meu)
+    r_dot_v = np.dot(r_init, v_init)
+    if debug:
+        print(f"{r0=}")
+        print(f"{v0=}")
+        print(f"{spec_energy=}")
+        print(f"{a=}")
     if a > 0:
-        x_guess = ((np.sqrt(meu)*dt)/a).to(DU_EARTH**(1/2))
+        x_guess = ((np.sqrt(meu)*dt)/a)
     if a < 0:
-        x_guess = hyperbolic_guess*DU_EARTH**(1/2)
+        x_guess = hyperbolic_guess*r_init.unit**(1/2)
 
     x_list = []
     z_list = []
@@ -378,11 +387,21 @@ def time_of_flight_universal_var(r_init, v_init, dt, meu, SandC=True,
     "dt/dx": dtdx_list
     }
     df = pd.DataFrame(printout)
-    #print(df) 
     f, g, f_dot, g_dot = get_fg(meu, x, z, S, C, r0, r, t)
 
     r_final = (f * r_init + g * v_init).to(r_init.unit)
     v_final = (f_dot * r_init + g_dot * v_init).to(v_init.unit)
+    if debug:
+        print(df) 
+        r1 = np.linalg.norm(r_final)
+        v1 = np.linalg.norm(v_final)
+        spec_energy1 = specific_energy_from_velo(v1, meu, r1)
+        a1 = semi_major_axis_from_energy(spec_energy, meu)
+        r_dot_v = np.dot(r_init, v_init)
+        print(f"{r1=}")
+        print(f"{v1=}")
+        print(f"{spec_energy1=}")
+        print(f"{a1=}")
 
     return (r_final, v_final)
 

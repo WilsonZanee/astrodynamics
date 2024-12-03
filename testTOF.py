@@ -5,7 +5,7 @@ from orbits import Orbit, OrbitalElements, interplanetary_transfer_dv
 import two_body_util as util
 
 OE = False
-TOF = False
+TOF = True
 gauss = False
 transfer = False
 grav_assist = False
