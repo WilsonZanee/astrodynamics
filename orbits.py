@@ -22,12 +22,16 @@ class OrbitalElements:
         self.theta = theta
 
     def __str__(self):
-        string = (f"Semi-Major Axis: {self.a}\n"
-                f"Eccentricity: {self.e}\n"
-                f"Inclination: {self.i} = {(np.rad2deg(self.i)).to(u.deg)}\n"
-                f"RAAN: {self.raan} = {(np.rad2deg(self.raan)).to(u.deg)}\n"
-                f"Argument of Periapsis: {self.omega} = {(np.rad2deg(self.omega)).to(u.deg)}\n"
-                f"True Anomaly: {self.theta} = {(np.rad2deg(self.theta)).to(u.deg)}\n"
+        string = (f"Semi-Major Axis: {self.a:.5f}\n"
+                f"Eccentricity: {self.e:.5f}\n"
+                f"Inclination: {self.i:.5f} = "
+                    f"{(np.rad2deg(self.i)).to(u.deg):.1f}\n"
+                f"RAAN: {self.raan:.5f} = "
+                    f"{(np.rad2deg(self.raan)).to(u.deg):.1f}\n"
+                f"Argument of Periapsis: {self.omega:.5f} = "
+                    f"{(np.rad2deg(self.omega)).to(u.deg):.1f}\n"
+                f"True Anomaly: {self.theta:.5f} = "
+                    f"{(np.rad2deg(self.theta)).to(u.deg):.1f}\n"
         )
         return string
     
@@ -286,6 +290,31 @@ def interplanetary_transfer_dv(r_parked_orbit,
                            transfer_angular_momentum,
                            v_transfer,
                            prints=print_v)
+    energy_infinity = util.specific_energy_from_velo_infinity(v_inf)
+    v_excess = util.velo_from_energy(energy_infinity, 
+                                                mu_planet, 
+                                                r_parked_orbit)
+    v_planet_parked = util.velo_from_radius(mu_planet, 
+                                            r_parked_orbit, 
+                                            r_parked_orbit)
+    if print_v:
+        print(f"V excess: {v_excess.to(u.km/u.s)}")
+        print(f"V parked: {v_planet_parked.to(u.km/u.s)}")
+
+
+    dv = v_excess - v_planet_parked
+    return dv
+
+def interplanetary_transfer_dv_vectors(r_parked_orbit, 
+                                       v_transfer,
+                                       v_planet,
+                                       mu_planet,
+                                       print_v=False):
+        
+    v_inf = np.linalg.norm(abs(v_planet - v_transfer))
+    if print_v:
+        print(f"{v_transfer=}, {v_planet=}")
+        print(f"{v_planet-v_transfer=}, {v_inf=}")
     energy_infinity = util.specific_energy_from_velo_infinity(v_inf)
     v_excess = util.velo_from_energy(energy_infinity, 
                                                 mu_planet, 
