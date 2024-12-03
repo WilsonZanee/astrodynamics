@@ -5,6 +5,8 @@
 # ---- IMPORT LIBRARIES ----
 import math
 import numpy as np
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 # ---- FUNCTIONS ----
 
@@ -264,3 +266,339 @@ def rvToOrbitalElements(r_vec,v_vec,mu,table,distance,time):
             return e_scalar, a, inclination, TrueAnomaly
         else:
             return e_scalar, a, inclination, TrueAnomaly, longAscendNode, ArgOfPeri
+        
+# ---- ITERATE TO FIND LAUNCH DATE ----
+def gauss(r1,r2,tof,mu,zguess,SHORTLONG):
+    # function GAUSS: Calculate v1 and v2 using Gauss' problem methods
+    tol = 1*10**(-7)
+    # -- Normalize the position vectors -- 
+    r1_scalar = math.sqrt(r1[0]**2 + r1[1]**2 + r1[2]**2)
+    r2_scalar = math.sqrt(r2[0]**2 + r2[1]**2 + r2[2]**2)
+    #print('|r1| = %.3f' % r1_scalar)
+    #print('|r2| = %.3f' % r2_scalar)
+    # -- Calculate angles of long and short methods -- 
+    r1dotr2 = r1[0]*r2[0] + r1[1]*r2[1] + r1[2]*r2[2]
+    thetaSHORT = math.acos(r1dotr2/(r1_scalar*r2_scalar))
+    thetaLONG = 2*math.pi - thetaSHORT
+    print(thetaSHORT)
+    print(thetaLONG)
+    #print('thetaShort = %.5f rad' % thetaSHORT)
+    #print('thetaLong = %.5f rad' % thetaLONG)
+    # -- Calculate area for short and long methods -- 
+    ASHORT =(math.sqrt(r1_scalar*r2_scalar)*math.sin(thetaSHORT))/(math.sqrt(1-math.cos(thetaSHORT)))
+    ALONG = (math.sqrt(r1_scalar*r2_scalar)*math.sin(thetaLONG))/(math.sqrt(1-math.cos(thetaLONG)))
+    #print('A Short = %.4f' % ASHORT)
+    #print('A Long  = %.4f' % ALONG)
+    # -- Take user Z guess to be her new z --
+    Zn = zguess
+    # -- Approximate S and C from Z -- 
+    if SHORTLONG == 'S':
+        #print('------------\nShort Way Chosen.\n------------')
+        A = ASHORT
+    else:
+        #print('------------\nLong Way Chosen.\n------------')
+        A = ALONG   
+    #print('zn         |    S(z)    |    C(z)    |      y       |      x      |     tn     |    TOF-t   |    dS/dZ    |    dC/dZ    |   dt/dZ  |    Zn+1')
+    #print('-------------------------------------------------------------------------------------------------------------------------------------------------') 
+    while True:
+        if Zn > 0 :
+            Sz = (math.sqrt(Zn)-math.sin(math.sqrt(Zn))) / (math.sqrt(Zn**3))
+            Cz = (1 - math.cos(math.sqrt(Zn))) / Zn
+        elif Zn < 0 :
+            Sz = (math.sinh(math.sqrt(-Zn))-math.sqrt(-Zn)) / math.sqrt((-Zn)**3)
+            Cz = (1-math.cosh(math.sqrt(-Zn))) / Zn
+        else:
+            Sz = (1/math.factorial(3)) - (Zn/math.factorial(5)) + ((Zn**2)/math.factorial(7)) - ((Zn**3)/math.factorial(9))
+            Cz = (1/math.factorial(2)) - (Zn/math.factorial(4)) + ((Zn**2)/math.factorial(6)) - ((Zn**3)/math.factorial(8))
+        y = r1_scalar + r2_scalar - A*(1-Zn*Sz)/math.sqrt(Cz)
+        x = math.sqrt(y/Cz)
+        tn = (1/math.sqrt(mu)) * ((x**3)*Sz + A*math.sqrt(y))
+        dSdZ = (Cz-3*Sz) / (2*Zn)
+        dCdZ = (1-Zn*Sz-2*Cz) / (2*Zn)
+        dtdZ = (1/math.sqrt(mu)) * ((x**3)*(dSdZ-(3*Sz*dCdZ)/(2*Cz)) + (A/8)*((3*Sz*math.sqrt(y)/Cz)+(A/x)))
+        Zn1 = Zn + (tof-tn)/dtdZ
+        if abs(tof-tn) <= tol: #abs(Zn-Zn1) >= 0:
+            #print('%.4f     |   %.4f   |   %.4f   |    %.4f    |    %.4f   |   %.4f   |   %.4f   |   %.4f   |   %.4f   |   %.4f | %.4f' %(Zn,Sz,Cz,y,x,tn,tof-tn,dSdZ,dCdZ,dtdZ,Zn1))
+            f = 1 - y/r1_scalar
+            g = A *math.sqrt(y/mu)
+            fdot = (-1*math.sqrt(mu)*x)*(1-Zn*Sz)/(r1_scalar*r2_scalar)
+            gdot = 1 - y/r2_scalar
+            v1 = [(1/g)*r2[0]-(f/g)*r1[0], (1/g)*r2[1]-(f/g)*r1[1], (1/g)*r2[2]-(f/g)*r1[2]]
+            v2 = [(gdot/g)*r2[0]-(1/g)*r1[0], (gdot/g)*r2[1]-(1/g)*r1[1], (gdot/g)*r2[2]-(1/g)*r1[2]]
+            #print('-----\nf = %.5f' % f)
+            #print('g = %.5f' % g)
+            #print('fdot = %.5f' % fdot)
+            #print('gdot = %.5f\n-----' % gdot)
+            #print(v1)
+            #print(v2)
+            break
+        #print('%.4f     |   %.4f   |   %.4f   |    %.4f    |    %.4f   |   %.4f   |   %.4f   |   %.4f   |   %.4f   |   %.4f | %.4f' %(Zn,Sz,Cz,y,x,tn,tof-tn,dSdZ,dCdZ,dtdZ,Zn1))
+        Zn = Zn1
+    return v1, v2
+
+def plotSynodicPeriod():
+    # function PLOTSYNODICPERIOD : Plot the synodic period of both Earth and Mars.
+    format_data = "%m/%d/%y %H:%M"
+    locationOfSun = [0, 0, 0] # [AU] Sun Position Vector in Heliocentric Frame
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # ---- PLOT LOCATION OF THE SUN ----
+    plt.plot(locationOfSun[0],locationOfSun[1],'y',marker=".",markersize=30)
+    # ---- PLANETARY ORBITAL OBJECTS ----
+    # -- EARTH --
+    aE = 1.000000; eE = 0.01671; iE = 0.00005; raanE = -11.26064; omegaE = 114.20783; thetaE = -2.48284
+    # -- MARS --
+    aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+    # -- ENSURE RESULTS ARE FORWARDED FOR ORBITAL ELEMENTS --
+    raddeg = "degree" # The 'degree' or 'radian' for parameters.
+    table = "elements" # The 'full' prints all calculations and results, 'elements' only forwards results.
+    distance = "AU" # The distance unit for table printing. Mainly used for 'full' prints.
+    time = "TU" # The time unit for table printing. Mainly used for 'full' prints.
+    # -- ESTABLISH POSITIONAL AND VELOCITY VECTORS AT MOMENT OF J2000 EPOCH --
+    J2000Epoch = datetime.strptime('1/1/00 11:58',format_data) # Capture the time of J2000 Epoch
+    [repochE,vepochE] = OrbitalElementsToRV(aE,eE,iE,raanE,omegaE,thetaE,mu,raddeg,table,distance,time)
+    [repochM,vepochM] = OrbitalElementsToRV(aM,eM,iM,raanM,omegaM,thetaM,mu,raddeg,table,distance,time)
+    day = 0 # [day] Iteration Reference for Syndoic Period Starting at J2000 Epoch
+    SyndoicPeriod = 781 # [days] Approximately equal to the 2.14 year E/M syndoic period
+    while True:
+        TOF = day / 58.13 # [TUsun] Time of Flight since Epoch
+        if day == 0:
+            plt.plot(repochE[0],repochE[1],'b',marker=".",markersize=20)
+            plt.plot(repochM[0],repochM[1],'r',marker=".",markersize=15)
+            plt.legend(["Sun","Synodic Period of Earth","Synodic Period of Mars"],loc="best")
+        else:
+            [rE,vE] = universalTOF_SCZ(repochE,vepochE,TOF,mu) 
+            [rM,vM] = universalTOF_SCZ(repochM,vepochM,TOF,mu)
+            plt.plot(rE[0],rE[1],'b',marker=".",markersize=3)
+            plt.plot(rM[0],rM[1],'r',marker=".",markersize=3)
+        if day == SyndoicPeriod:
+            break
+        else:
+            day += 1
+    plt.title("Heliocentric Synodic Period of Earth and Mars")
+    plt.xlabel("X-Position [AU]")
+    plt.ylabel("Y-Position [AU]")
+    plt.show()
+
+def plotTOF(time_data):
+    # function PLOTTOF : Plot the time of flight and compare the position of departure and arrival.
+    format_data = "%m/%d/%y %H:%M"
+    locationOfSun = [0, 0, 0] # [AU] Sun Position Vector in Heliocentric Frame
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # ---- PLOT LOCATION OF THE SUN ----
+    plt.plot(locationOfSun[0],locationOfSun[1],'y',marker=".",markersize=30)
+    # ---- PLANETARY ORBITAL OBJECTS ----
+    # -- EARTH --
+    aE = 1.000000; eE = 0.01671; iE = 0.00005; raanE = -11.26064; omegaE = 114.20783; thetaE = -2.48284
+    # -- MARS --
+    aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+    # -- ENSURE RESULTS ARE FORWARDED FOR ORBITAL ELEMENTS --
+    raddeg = "degree" # The 'degree' or 'radian' for parameters.
+    table = "elements" # The 'full' prints all calculations and results, 'elements' only forwards results.
+    distance = "AU" # The distance unit for table printing. Mainly used for 'full' prints.
+    time = "TU" # The time unit for table printing. Mainly used for 'full' prints.
+    # -- ESTABLISH POSITIONAL AND VELOCITY VECTORS AT MOMENT OF J2000 EPOCH --
+    J2000Epoch = datetime.strptime('1/1/00 11:58',format_data) # Capture the time of J2000 Epoch
+    [repochE,vepochE] = OrbitalElementsToRV(aE,eE,iE,raanE,omegaE,thetaE,mu,raddeg,table,distance,time)
+    [repochM,vepochM] = OrbitalElementsToRV(aM,eM,iM,raanM,omegaM,thetaM,mu,raddeg,table,distance,time)
+    departureTime = datetime.strptime(time_data,format_data)
+    
+    day = 0 # [day] Iteration Reference for Syndoic Period Starting at J2000 Epoch
+    SyndoicPeriod = 781 # [days] Approximately equal to the 2.14 year E/M syndoic period
+    while True:
+        TOF = day / 58.13 # [TUsun] Time of Flight since Epoch
+        if day == 0:
+            plt.plot(repochE[0],repochE[1],'b',marker=".",markersize=20)
+            plt.plot(repochM[0],repochM[1],'r',marker=".",markersize=15)
+            plt.legend(["Sun","Synodic Period of Earth","Synodic Period of Mars"],loc="best")
+        else:
+            [rE,vE] = universalTOF_SCZ(repochE,vepochE,TOF,mu) 
+            [rM,vM] = universalTOF_SCZ(repochM,vepochM,TOF,mu)
+            plt.plot(rE[0],rE[1],'b',marker=".",markersize=3)
+            plt.plot(rM[0],rM[1],'r',marker=".",markersize=3)
+        if day == SyndoicPeriod:
+            break
+        else:
+            day += 1
+    plt.title("Heliocentric Synodic Period of Earth and Mars")
+    plt.xlabel("X-Position [AU]")
+    plt.ylabel("Y-Position [AU]")
+    plt.show()
+
+def gaussSHORTWAYcheck(r1,r2):
+    # function GAUSSSHORTWAYCHECK : See if the 190 day transfer is reasonable.
+    # -- Normalize the position vectors -- 
+    r1_scalar = math.sqrt(r1[0]**2 + r1[1]**2 + r1[2]**2)
+    r2_scalar = math.sqrt(r2[0]**2 + r2[1]**2 + r2[2]**2)
+    #print('|r1| = %.3f' % r1_scalar)
+    #print('|r2| = %.3f' % r2_scalar)
+    # -- Calculate angles of long and short methods -- 
+    r1dotr2 = r1[0]*r2[0] + r1[1]*r2[1] + r1[2]*r2[2]
+    thetaSHORT = math.acos(r1dotr2/(r1_scalar*r2_scalar))
+    return thetaSHORT
+    
+def reasonableLaunchSearch(time_data):
+    # function LAUNCHDATE : Approximate the departure date from Earth to find 190 day SHORT transfer flight to Mars
+    format_data = "%m/%d/%y %H:%M"
+    tolerance = 1*10**(-3) # Iterative tolerance
+    TUtimeOfFlight = 190/58.13 # [TUsun] 190-Day Transfer Converted
+    # ---- PLANETARY ORBITAL OBJECTS ----
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # -- EARTH --
+    aE = 1.000000; eE = 0.01671; iE = 0.00005; raanE = -11.26064; omegaE = 114.20783; thetaE = -2.48284
+    # -- MARS --
+    aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+    # -- ENSURE RESULTS ARE FORWARDED FOR ORBITAL ELEMENTS --
+    raddeg = "degree" # The 'degree' or 'radian' for parameters.
+    table = "elements" # The 'full' prints all calculations and results, 'elements' only forwards results.
+    distance = "AU" # The distance unit for table printing. Mainly used for 'full' prints.
+    time = "TU" # The time unit for table printing. Mainly used for 'full' prints.
+    # -- ESTABLISH POSITIONAL AND VELOCITY VECTORS AT MOMENT OF J2000 EPOCH --
+    J2000Epoch = datetime.strptime('1/1/00 11:58',format_data) # Capture the time of J2000 Epoch
+    [repochE,vepochE] = OrbitalElementsToRV(aE,eE,iE,raanE,omegaE,thetaE,mu,raddeg,table,distance,time)
+    [repochM,vepochM] = OrbitalElementsToRV(aM,eM,iM,raanM,omegaM,thetaM,mu,raddeg,table,distance,time)
+    # -- MAKE INITIAL ESTIMATE FOR DATE OF EARTH DEPARTURE --
+    earth_departure_date = datetime.strptime(time_data, format_data) # Establish initial guess of Earth departure at 1/1/21 00:00
+    failure_date = date = datetime.strptime("2/21/23 12:00", format_data)
+    mars_arrival_date = earth_departure_date + timedelta(days=190) # Establish initial guess of Mars arrival after 190 day TOF
+    i = 0 # Time start at midnight 00:00 (minutes passes counter)
+    # -- ENTER INTERATIVE LOOP --
+    
+    while True:
+        # -- CALCULATE INITIAL TIMES OF FLIGHT -- 
+        earthTIMECHANGE = (earth_departure_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Earth Departure
+        TOFearth = earthTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Earth since Epoch
+        marsTIMECHANGE = (mars_arrival_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Mars Arrival
+        TOFmars = marsTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Mars since Epoch
+        # -- CALCULATE INITIAL ESTIMATES FOR DEPARTURE AND ARRIVAL VECTORS --
+        [rEDepart,vEDepart] = universalTOF_SCZ(repochE,vepochE,TOFearth,mu) 
+        [rMArrival,vMArrival] = universalTOF_SCZ(repochM,vepochM,TOFmars,mu)
+        rE = math.sqrt(rEDepart[0]**2 + rEDepart[1]**2 + rEDepart[2]**2) # [AU] Magnitude of rEDepart
+        rM = math.sqrt(rMArrival[0]**2 + rMArrival[1]**2 + rMArrival[2]**2) # [AU] Magnitude of rMArrival
+        vE = math.sqrt(vEDepart[0]**2 + vEDepart[1]**2 + vEDepart[2]**2) # [AU/TU] Magnitude of vEDepart
+        vM = math.sqrt(vMArrival[0]**2 + vMArrival[1]**2 + vMArrival[2]**2) # [AU/TU] Magnitude of vMArrival
+        # -- IMPLEMENT GAUSS'S PROBLEM --
+        thetaSHORT = gaussSHORTWAYcheck(rEDepart,rMArrival)
+
+        if thetaSHORT < 1*math.pi/10:
+            if earth_departure_date == failure_date:
+                #print("Number of dates valid out of 781 : ",i)
+                #print("PROGRAM ENDED. SYNODIC PERIOD PASSED.")
+                break
+            if i == 0:
+                first_guess_departure = earth_departure_date
+                first_guess_arrival = mars_arrival_date
+            #print("A DATE WAS FOUND", earth_departure_date ," , ", mars_arrival_date," , ", thetaSHORT)
+            earth_departure_date = earth_departure_date + timedelta(days=1)
+            mars_arrival_date = earth_departure_date + timedelta(days=190)
+            i = i+1
+        else:
+            if earth_departure_date == failure_date:
+                #print("Number of dates valid out of 781 : ",i)
+                #print("PROGRAM ENDED. SYNODIC PERIOD PASSED.")
+                break
+            earth_departure_date = earth_departure_date + timedelta(days=1)
+            mars_arrival_date = earth_departure_date + timedelta(days=190)
+    return first_guess_departure, first_guess_arrival
+    
+def launchDatePositions(departure_data, arrival_data):
+    # function LAUNCHDATE : Approximate the departure date from Earth to find 190 day SHORT transfer flight to Mars
+    format_data = "%m/%d/%y %H:%M"
+    tolerance = 1*10**(-3) # Iterative tolerance
+    TUtimeOfFlight = 190/58.13 # [TUsun] 190-Day Transfer Converted
+    # ---- PLANETARY ORBITAL OBJECTS ----
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # -- EARTH --
+    aE = 1.000000; eE = 0.01671; iE = 0.00005; raanE = -11.26064; omegaE = 114.20783; thetaE = -2.48284
+    # -- MARS --
+    aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+    # -- ENSURE RESULTS ARE FORWARDED FOR ORBITAL ELEMENTS --
+    raddeg = "degree" # The 'degree' or 'radian' for parameters.
+    table = "elements" # The 'full' prints all calculations and results, 'elements' only forwards results.
+    distance = "AU" # The distance unit for table printing. Mainly used for 'full' prints.
+    time = "TU" # The time unit for table printing. Mainly used for 'full' prints.
+    # -- ESTABLISH POSITIONAL AND VELOCITY VECTORS AT MOMENT OF J2000 EPOCH --
+    J2000Epoch = datetime.strptime('1/1/00 11:58',format_data) # Capture the time of J2000 Epoch
+    [repochE,vepochE] = OrbitalElementsToRV(aE,eE,iE,raanE,omegaE,thetaE,mu,raddeg,table,distance,time)
+    [repochM,vepochM] = OrbitalElementsToRV(aM,eM,iM,raanM,omegaM,thetaM,mu,raddeg,table,distance,time)
+    # -- MAKE INITIAL ESTIMATE FOR DATE OF EARTH DEPARTURE --
+    earth_departure_date = datetime.strptime(departure_data, format_data) # Establish initial guess of Earth departure at 1/1/21 00:00
+    mars_arrival_date = datetime.strptime(arrival_data, format_data) # Establish initial guess of Mars arrival after 190 day TOF
+    # -- CALCULATE INITIAL TIMES OF FLIGHT -- 
+    earthTIMECHANGE = (earth_departure_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Earth Departure
+    TOFearth = earthTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Earth since Epoch
+    marsTIMECHANGE = (mars_arrival_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Mars Arrival
+    TOFmars = marsTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Mars since Epoch
+    # -- CALCULATE INITIAL ESTIMATES FOR DEPARTURE AND ARRIVAL VECTORS --
+    [rEDepart,vEDepart] = universalTOF_SCZ(repochE,vepochE,TOFearth,mu) 
+    [rMArrival,vMArrival] = universalTOF_SCZ(repochM,vepochM,TOFmars,mu)
+    return rEDepart, rMArrival
+
+def launchDate(departure_data, arrival_data):
+    # function LAUNCHDATE : Approximate the departure date from Earth to find 190 day SHORT transfer flight to Mars
+    format_data = "%m/%d/%y %H:%M"
+    tolerance = 1*10**(-3) # Iterative tolerance
+    TUtimeOfFlight = 190/58.13 # [TUsun] 190-Day Transfer Converted
+    # ---- PLANETARY ORBITAL OBJECTS ----
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # -- EARTH --
+    aE = 1.000000; eE = 0.01671; iE = 0.00005; raanE = -11.26064; omegaE = 114.20783; thetaE = -2.48284
+    # -- MARS --
+    aM = 1.523662; eM = 0.093412; iM = 1.85061; raanM = 49.57854; omegaM = 286.4623; thetaM = 19.41248
+    # -- ENSURE RESULTS ARE FORWARDED FOR ORBITAL ELEMENTS --
+    raddeg = "degree" # The 'degree' or 'radian' for parameters.
+    table = "elements" # The 'full' prints all calculations and results, 'elements' only forwards results.
+    distance = "AU" # The distance unit for table printing. Mainly used for 'full' prints.
+    time = "TU" # The time unit for table printing. Mainly used for 'full' prints.
+    # -- ESTABLISH POSITIONAL AND VELOCITY VECTORS AT MOMENT OF J2000 EPOCH --
+    J2000Epoch = datetime.strptime('1/1/00 11:58',format_data) # Capture the time of J2000 Epoch
+    [repochE,vepochE] = OrbitalElementsToRV(aE,eE,iE,raanE,omegaE,thetaE,mu,raddeg,table,distance,time)
+    [repochM,vepochM] = OrbitalElementsToRV(aM,eM,iM,raanM,omegaM,thetaM,mu,raddeg,table,distance,time)
+    # -- MAKE INITIAL ESTIMATE FOR DATE OF EARTH DEPARTURE --
+    earth_departure_date = datetime.strptime(departure_data, format_data) # Establish initial guess of Earth departure at 1/1/21 00:00
+    failure_date = date = datetime.strptime("1/1/24 12:00", format_data)
+    mars_arrival_date = datetime.strptime(arrival_data, format_data) # Establish initial guess of Mars arrival after 190 day TOF
+    i = 0 # Time start at midnight 00:00 (minutes passes counter)
+    # -- ENTER INTERATIVE LOOP --
+    
+    
+    
+    
+    
+    
+    
+    
+    while True:
+        # -- CALCULATE INITIAL TIMES OF FLIGHT -- 
+        earthTIMECHANGE = (earth_departure_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Earth Departure
+        TOFearth = earthTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Earth since Epoch
+        marsTIMECHANGE = (mars_arrival_date - J2000Epoch) # Amount of time passed since J2000 EPOCH to Mars Arrival
+        TOFmars = marsTIMECHANGE.total_seconds() / 58.13 # [TUsun] Time of Flight of Mars since Epoch
+        # -- CALCULATE INITIAL ESTIMATES FOR DEPARTURE AND ARRIVAL VECTORS --
+        [rEDepart,vEDepart] = universalTOF_SCZ(repochE,vepochE,TOFearth,mu) 
+        [rMArrival,vMArrival] = universalTOF_SCZ(repochM,vepochM,TOFmars,mu)
+        rE = math.sqrt(rEDepart[0]**2 + rEDepart[1]**2 + rEDepart[2]**2) # [AU] Magnitude of rEDepart
+        rM = math.sqrt(rMArrival[0]**2 + rMArrival[1]**2 + rMArrival[2]**2) # [AU] Magnitude of rMArrival
+        vE = math.sqrt(vEDepart[0]**2 + vEDepart[1]**2 + vEDepart[2]**2) # [AU/TU] Magnitude of vEDepart
+        vM = math.sqrt(vMArrival[0]**2 + vMArrival[1]**2 + vMArrival[2]**2) # [AU/TU] Magnitude of vMArrival
+        # -- IMPLEMENT GAUSS'S PROBLEM --
+        [vE_guess,vM_guess] = gauss(rEDepart,rMArrival,TUtimeOfFlight,mu,1,"S")
+        vEguess_mag = math.sqrt(vE_guess[0]**2 + vE_guess[1]**2 + vE_guess[2]**2)
+        vMguess_mag = math.sqrt(vM_guess[0]**2 + vM_guess[1]**2 + vM_guess[2]**2)
+        vEartherror = abs(vEguess_mag - vE)
+        vMarserror = abs(vMguess_mag - vM)
+        if (vEartherror <= tolerance and vMarserror <= tolerance) or earth_departure_date == failure_date:
+            if earth_departure_date == failure_date:
+                print("PROGRAM FAILED. SYNODIC PERIOD PASSED.")
+            else:
+                print("A DATE WAS FOUND")
+                print(earth_departure_date)
+                print(mars_arrival_date)
+                print(vEartherror)
+                print(vMarserror)
+            break
+        else:
+            earth_departure_date = earth_departure_date + timedelta(days=1)
+            mars_arrival_date = earth_departure_date + timedelta(days=190)
+            i = i+1
+            print(earth_departure_date)
+    return
