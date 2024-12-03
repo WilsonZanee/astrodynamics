@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pypdf import PdfMerger
 from fpdf import FPDF
+import win32com.client
 
 
 def merge_pdfs(files):
@@ -20,7 +21,7 @@ def merge_pdfs(files):
         if ext == '.pdf':
             pdfs.append(file)
         elif ext == '.py':
-            pdfs.append(convert_to_pdf(file))
+            pdfs.append(py_to_pdf(file))
         else:
             print(f"Error: This program does not support {ext} files.")
             sys.exit(1)
@@ -32,7 +33,7 @@ def merge_pdfs(files):
     print(pdf_path)
     merger.write(pdf_path)
 
-def convert_to_pdf(file):
+def py_to_pdf(file):
     dir = os.path.dirname(file)
     basename = os.path.basename(file)
     pdf_path = os.path.join(dir, "pdf_output", f"{basename}.pdf")
@@ -48,7 +49,7 @@ def convert_to_pdf(file):
     return pdf_path
 
 """
-def convert_to_pdf(file):
+def py_to_pdf(file):
     dir = os.path.dirname(file)
     basename = os.path.basename(file)
     pdf_path = os.path.join(dir, f"{basename}.pdf")
