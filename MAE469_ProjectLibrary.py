@@ -624,6 +624,11 @@ def earth_to_mars_dv(r_earth1, v_earth1, r_mars1, v_mars1, dt12, r_parked_e1,
                                                         print_convergence_table=debug
                                                         )["short"]
 
+    if debug:
+        zane_plot(r_earth1.value, v_earth1.value, 
+                  r_mars2.value, v_mars2.value, 
+                  flight_vectors=flight_velo_vectors_12)
+
     orbit1 = Orbit(r_vector=r_earth1, v_vector=flight_velo_vectors_12["v1"],
                 meu=mu_sun)
     orbit2 = Orbit(r_vector=r_mars2, v_vector=flight_velo_vectors_12["v2"],
@@ -685,3 +690,78 @@ def find_best_dv(start_date, end_date, step_size, repochE, vepochE,
             if debug:
                 traceback.print_exc()
     return best_date, best_dv
+
+def find_best_dv_v2(start_date, end_date, step_size, repochE, vepochE,
+                 repochM, vepochM, mu, transfer_length, earth_orbit, 
+                 mars_orbit, epoch, debug=False):
+    
+    start_TOF = ((abs((start_date - epoch).total_seconds())*u.s)).to(u.day)
+    end_TOF = ((abs((end_date - epoch).total_seconds())*u.s)).to(u.day)
+    time_options = np.arange(start_TOF.value, end_TOF.value, 
+                             step_size.to(u.day).value)
+    best_date = datetime.fromisoformat('2025-12-25 08:37:00.000')
+    best_dv = 100000*u.km/u.s
+
+    #test_date = datetime.fromisoformat('2025-01-01 12:00:00.000')
+    #time_options = [(((abs((test_date - epoch).total_seconds())*u.s)).to(u.day)).value]
+
+    for TOF in time_options:
+        TOF_day = (TOF*u.day)
+        TOF_TU = TOF_day.to(util.TU_SUN)
+        date = epoch + timedelta(days=TOF_day.value)
+        try:
+            [r1E,v1E] = universalTOF_SCZ(repochE,vepochE,TOF_TU.value,mu)
+            [r1M,v1M] = universalTOF_SCZ(repochM,vepochM,TOF_TU.value,mu)
+            mu_sun = 1*util.MEU_SUN
+            mu_earth = 1*util.MEU_EARTH
+
+            r_mars2, v_mars2 = util.time_of_flight_universal_var(r1M*util.AU_SUN, 
+                                                                 v1M*util.AUTU_SUN, 
+                                                                 transfer_length, 
+                                                        mu_sun, debug=debug)
+            orbitE = Orbit(r_vector=r1E*util.AU_SUN, 
+                           v_vector=v1E*util.AUTU_SUN,
+                           meu=mu_sun)
+            orbitM = Orbit(r_vector=r_mars2, 
+                           v_vector=v_mars2,
+                           meu=mu_sun)
+            diff = abs(orbitE.orbital_elements.theta.value - orbitM.orbital_elements.theta.value)
+            print(f"{date=}, {diff=}")
+            if diff > (np.pi*0.9/2) and diff <= np.pi/2:
+                dv = earth_to_mars_dv(r1E*util.AU_SUN, v1E*util.AUTU_SUN, 
+                                        r1M*util.AU_SUN, v1M*util.AUTU_SUN, 
+                                        transfer_length, earth_orbit, mars_orbit,
+                                        debug=debug)
+                print(f"{date=}, {dv=}")
+                if dv < best_dv:
+                    best_date = date
+                    best_dv = dv
+        except Exception as e:
+            if debug:
+                traceback.print_exc()
+    return best_date, best_dv
+
+def zane_plot(rE, vE, rM, vM, flight_vectors=None):
+    locationOfSun = [0, 0, 0] # [AU] Sun Position Vector in Heliocentric Frame
+    mu = 1 # [AU3/TU2] Heliocentric gravitational parameter
+    # ---- PLOT LOCATION OF THE SUN ----
+    plt.plot(locationOfSun[0],locationOfSun[1],'y',marker=".",markersize=30)
+    plt.plot(rE[0],rE[1],'b',marker=".",markersize=20)
+    plt.plot(rM[0],rM[1],'r',marker=".",markersize=15)
+    plt.quiver(rE[0],rE[1], vE[0], vE[1], color='b')
+    plt.quiver(rM[0],rM[1], vM[0], vM[1], color='r')
+    if flight_vectors is not None:
+        plt.quiver(rE[0],rE[1], 
+                   flight_vectors["v1"][0].value, 
+                   flight_vectors["v1"][1].value, 
+                   color='k')
+        plt.quiver(rM[0],rM[1], 
+                   flight_vectors["v2"][0].value, 
+                   flight_vectors["v2"][1].value, 
+                   color='k')
+    plt.legend(["Sun","Synodic Period of Earth","Synodic Period of Mars"],loc="best")
+    plt.title("Heliocentric Synodic Period of Earth and Mars")
+    plt.xlabel("X-Position [AU]")
+    plt.ylabel("Y-Position [AU]")
+    plt.axis('square')
+    plt.show()

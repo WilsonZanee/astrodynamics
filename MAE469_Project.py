@@ -77,10 +77,11 @@ earth_orbit = 200*u.km + 1*util.DU_EARTH
 mars_orbit = 1000*u.km + 3389.5*u.km
 
 start_date = datetime.fromisoformat('2021-01-01 12:00:00.000')
-end_date = datetime.fromisoformat('2030-01-01 12:00:00.000')
+#end_date = datetime.fromisoformat('2030-01-01 12:00:00.000')
+end_date = datetime.fromisoformat('2024-01-01 12:00:00.000')
 step_size = 10*u.day
 
-best_date, best_dv = PROJ.find_best_dv(start_date, end_date, step_size,
+best_date, best_dv = PROJ.find_best_dv_v2(start_date, end_date, step_size,
                                        repochE, vepochE, repochM, vepochM,
                                        mu, dt, earth_orbit, mars_orbit, epoch)
 
@@ -105,3 +106,6 @@ print(' Earth  |        ',np.around(r2E,4), '        |         ',np.around(v2E,4
 print('  Mars  |        ',np.around(r2M,4), '        |         ',np.around(v2M,4), '         |       ', np.around(TrueAnomalyM2,4))
 print(best_date)
 print(f"dV for transfer: {best_dv}")
+
+PROJ.zane_plot(r2E, v2E, r2M, v2M)
+
